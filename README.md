@@ -114,7 +114,7 @@ npm run build:apk:local
 El resultado es `WebDollar-wallet-debug.apk`. En esta ejecución se generó y verificó:
 
 ```text
-SHA-256: 822034480E07D39119C7D077E53F6D8CE2D94DD13D6CA6755BE831A2C250B332
+SHA-256: A9F78FC6602628E1F415B02C783C61F46C30D65120D19CD410C40A787FDF92D7
 Package: com.webdollar.wallet
 Version: 2.0.0 (20)
 ```
