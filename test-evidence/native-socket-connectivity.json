@@ -1,0 +1,11 @@
+{
+  "checkedAt": "2026-09-05T04:04:11.611Z",
+  "endpoint": "https://pool.timi.ro",
+  "kind": "read-only-native-socket-probe",
+  "privateWalletAccessed": false,
+  "transactionsBroadcast": 0,
+  "connected": true,
+  "answerEvent": "api/top/answer/undefined",
+  "top": 5969957,
+  "isSynchronized": true
+}

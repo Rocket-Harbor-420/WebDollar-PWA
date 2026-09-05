@@ -1,0 +1,15 @@
+{
+  "checkedAt": "2026-09-05T05:16:02.598Z",
+  "kind": "read-only-mining-pool-handshake",
+  "endpoint": "https://pool.timi.ro",
+  "privateWalletAccessed": false,
+  "transactionsBroadcast": 0,
+  "poolName": "Timi",
+  "poolUseSignatures": false,
+  "workDelivered": true,
+  "height": 5970057,
+  "workType": "PoS",
+  "targetBytes": 32,
+  "blockBytes": 859,
+  "balanceUnits": 2673140
+}

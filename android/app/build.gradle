@@ -1,0 +1,30 @@
+plugins {
+  id 'com.android.application'
+}
+
+android {
+  namespace 'com.webdollar.wallet'
+  compileSdk 35
+
+  defaultConfig {
+    applicationId 'com.webdollar.wallet'
+    minSdk 23
+    targetSdk 35
+    versionCode 20
+    versionName '2.0.0'
+  }
+
+  buildTypes {
+    release {
+      minifyEnabled false
+      shrinkResources false
+      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+    }
+  }
+
+  sourceSets {
+    main {
+      assets.srcDirs = ['src/main/assets']
+    }
+  }
+}

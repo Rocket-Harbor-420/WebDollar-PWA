@@ -1,0 +1,38 @@
+flowchart LR
+  File[Selector local .webd]
+  UI[UI PWA / Confirmar Envío]
+  Core[WalletCore / claves privadas en RAM]
+  Crypto[TweetNaCl Ed25519 / HASH160 / WIF]
+  Policy[Transacción v2 / comisión fija 10 WEBD inmutable]
+  Net[Adaptador REST + JSON-RPC + Socket.IO nativo]
+  Node[Nodo WebDollar Mainnet externo]
+  Bus{{EventBus}}
+  PM[PluginManager / init y fallos aislados]
+  Mining[Módulo minería / motor pendiente]
+  Worker[Host Web Worker / sin claves]
+  Offline[Módulo offline / transacción firmada]
+  QR[QR local / lectura de imagen]
+  Receiver[Otra instancia / validar firma]
+  Cache[(Caché estática PWA)]
+  Block[Política incompatible / bloqueo explícito]
+
+  File -->|bytes locales| Core
+  UI -->|hooks limitados| Core
+  Core --> Crypto
+  Core --> Policy
+  Policy -->|verificación previa| Block
+  UI -->|confirmación humana cuando sea compatible| Net
+  Core -->|consultas y payload firmado| Net
+  Net <--> Node
+  Core <--> Bus
+  UI --> PM
+  PM --> Mining
+  PM --> Offline
+  Mining -->|dirección y saldo por hooks| Core
+  Mining --> Worker
+  Offline -->|preparar / recibir firmado| Core
+  Offline --> QR
+  QR --> Receiver
+  Receiver -->|revisar reclamo| UI
+  Bus --> UI
+  UI -->|service worker solo app shell| Cache

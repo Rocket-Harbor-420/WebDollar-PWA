@@ -1,0 +1,11 @@
+{
+  "checkedAt": "2026-09-05T05:06:06.309Z",
+  "endpoint": "https://pool.timi.ro",
+  "kind": "read-only-native-browser-probe",
+  "privateWalletAccessed": false,
+  "transactionsBroadcast": 0,
+  "connected": true,
+  "transport": "polling",
+  "helloNodeType": 1,
+  "errors": []
+}

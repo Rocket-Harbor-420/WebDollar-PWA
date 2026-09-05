@@ -1,0 +1,250 @@
+{
+  "checkedAt": "2026-09-05T03:53:59.549Z",
+  "kind": "read-only-public-node-discovery",
+  "privateWalletAccessed": false,
+  "transactionsBroadcast": 0,
+  "results": [
+    {
+      "url": "https://pool.timi.ro",
+      "status": 200,
+      "cors": "*",
+      "response": "{\"top\":5969947,\"is_synchronized\":true,\"secondsBehind\":-23.375}"
+    },
+    {
+      "url": "https://node.timi.ro",
+      "error": "CERT_HAS_EXPIRED"
+    },
+    {
+      "url": "https://webd.serverworks.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://webd.5q.ro:8443",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://daniuda.ddns.net:8080",
+      "error": "ERR_SSL_WRONG_VERSION_NUMBER"
+    },
+    {
+      "url": "https://doris.webdollarpool.ca",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://webd-europool.ddns.net:2222",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://us-est.webdmine.io:8443",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://webdmine.io:8443",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://pool.maison:8443",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://europe.pool.maison:8443",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node.spyclub.ro:8080",
+      "error": "The operation was aborted due to timeout"
+    },
+    {
+      "url": "https://webdollarpool.ca",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://webd.pool.coffee:8443",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node1.petreus.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node2.petreus.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node3.petreus.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node4.petreus.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node5.petreus.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node6.petreus.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node7.petreus.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node8.petreus.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node9.petreus.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node10.petreus.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node1.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node2.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node3.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node4.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node5.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node6.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node7.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node8.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node9.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node10.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node11.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node12.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node13.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node14.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node15.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node16.timi.ro",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node1.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node2.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node3.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node4.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node5.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node6.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node7.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node8.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node9.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node10.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node11.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node12.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node13.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node14.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://node15.webdollarminingpool.com",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://falx.romeonet.ro:65001",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://romeonet.ddns.net:65101",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://cryptocoingb.ddns.net:8080",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://cryptocoingb.ddns.net:8081",
+      "error": "ENOTFOUND"
+    },
+    {
+      "url": "https://bacm.ro:2053",
+      "error": "ENOTFOUND"
+    }
+  ]
+}

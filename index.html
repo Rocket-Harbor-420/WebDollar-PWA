@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07131a"><meta name="description" content="Cartera local WebDollar con consulta Mainnet y firma en tu dispositivo.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <link rel="manifest" href="manifest.json"><link rel="icon" href="assets/icon-192.png"><link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="styles.css"><title>WebDollar · Tu cartera</title>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <a class="brand" href="#wallet"><span class="brand-mark">W</span><span><strong>WebDollar</strong><small>WALLET / MAINNET</small></span></a>
+    <div class="topbar-actions"><span id="network-pill" class="network-pill">Sin conexión verificada</span><button id="install-button" class="button button-small" hidden>Instalar app</button><button id="lock-button" class="icon-button" aria-label="Bloquear cartera" title="Bloquear cartera">⌁</button></div>
+  </header>
+  <main class="main-layout">
+    <section class="hero-section" id="wallet">
+      <div class="eyebrow"><span class="status-dot"></span> Claves locales · Red WebDollar</div>
+      <div class="hero-heading"><div><h1>Tu saldo,<br><em>en tus manos.</em></h1><p class="hero-copy">Conecta tu cartera. Consulta la cadena. Firma en tu dispositivo.</p></div><div class="wallet-address-chip"><span id="short-address">Sin cartera</span><button id="copy-address-top" class="copy-button" aria-label="Copiar dirección">⧉</button></div></div>
+
+      <section class="setup-card" aria-labelledby="setup-title">
+        <div class="setup-icon">↥</div><div class="setup-copy"><h2 id="setup-title">Abre tu cartera WebDollar</h2><p>Selecciona tu archivo .webd. Sus claves permanecerán en esta sesión.</p></div>
+        <div class="setup-actions"><label class="file-picker button button-primary" for="wallet-file">Importar .webd →</label><input id="wallet-file" type="file" accept=".webd" hidden><small id="wallet-file-name" class="file-name">Ningún archivo seleccionado</small></div>
+      </section>
+      <div class="wallet-secondary-actions"><button id="create-wallet" class="text-button">Crear cartera</button><button id="restore-wallet" class="text-button">Recuperar con frase</button><button id="watch-wallet" class="text-button">Consultar una dirección</button><button id="export-wallet" class="text-button" disabled>Exportar .webd</button></div>
+
+      <details class="panel connection-panel" id="connection-settings">
+        <summary>Conexión Mainnet <span id="connection-summary">Configurar nodo</span></summary>
+        <form id="connection-form">
+          <label for="http-endpoint">Nodo de consulta (REST)</label><input id="http-endpoint" type="url" placeholder="https://tu-nodo.example" autocomplete="off">
+      <label for="rpc-endpoint">Nodo de envío (JSON-RPC)</label><input id="rpc-endpoint" type="url" placeholder="https://tu-nodo.example" autocomplete="off">
+          <details><summary>Autenticación RPC opcional</summary><label for="rpc-user">Usuario</label><input id="rpc-user" autocomplete="off"><label for="rpc-password">Contraseña del nodo</label><input id="rpc-password" type="password" autocomplete="off"></details>
+          <p class="small-note">Las URLs y credenciales se conservan solo durante esta sesión. El navegador necesita que el nodo admita CORS.</p>
+          <button class="button button-secondary" type="submit">Conectar y consultar</button>
+        </form>
+      </details>
+      <p id="connection-status" class="connection-status" role="status">El saldo aparecerá después de consultar un nodo real.</p>
+
+      <div id="wallet-content" hidden>
+        <div class="balance-grid">
+          <article class="balance-card balance-card-main">
+            <div class="card-label"><span>Saldo en cadena</span><span id="balance-state" class="live-label">SIN CONSULTAR</span></div>
+            <div class="balance-value"><span id="balance-value">—</span><small>WEBD</small></div>
+            <div class="balance-meta"><span id="balance-height">Altura —</span><button id="refresh-balance" class="text-button">Actualizar ↻</button></div>
+            <small id="balance-source">Fuente no disponible</small>
+          </article>
+          <article class="balance-card balance-card-mining"><div class="card-label"><span>Minería</span><span id="mining-indicator" class="module-tag">POOL</span></div><div class="mining-value"><span id="hash-rate">—</span><small>H/s</small></div><p class="small-note">PoW Argon2 y PoS firmado localmente mediante trabajo Mainnet.</p><button id="mining-toggle" class="button button-dark">Iniciar minería</button></article>
+        </div>
+        <div class="content-grid">
+          <section class="panel transaction-panel"><div class="panel-heading"><div><span class="panel-kicker">TRANSFERIR</span><h2>Enviar WEBD</h2></div><span class="panel-symbol">↗</span></div>
+            <form id="send-form"><label for="recipient">Dirección destino</label><div class="input-with-action"><input id="recipient" required autocomplete="off" placeholder="WEBD$..."><button id="paste-recipient" type="button" class="field-action">Pegar</button></div><label for="amount">Monto total</label><div class="amount-input"><input id="amount" type="text" inputmode="decimal" required placeholder="0.00"><span>WEBD</span></div><div class="send-summary"><span>Revisa el monto que recibe el destinatario.</span><strong id="send-total">0.00 WEBD</strong></div><button class="button button-primary button-wide" type="submit">Revisar envío →</button></form>
+          </section>
+          <section class="panel receive-panel"><div class="panel-heading"><div><span class="panel-kicker">RECIBIR</span><h2>Tu dirección</h2></div><span class="panel-symbol">↙</span></div><div class="receive-content"><div class="qr-frame"><img id="qr-image" alt="QR de tu dirección WebDollar"></div><div class="receive-details"><p>Comparte esta dirección para recibir WEBD.</p><div id="full-address" class="address-box"></div><button id="copy-address" class="button button-secondary button-wide">Copiar dirección ⧉</button></div></div></section>
+        </div>
+        <section class="panel modules-panel"><div class="panel-heading"><div><span class="panel-kicker">EXTENSIONES</span><h2>Módulos conectados</h2></div><span class="module-count">2 conectores</span></div><div class="module-list"><article class="module-row"><div class="module-icon mining-icon">◒</div><div class="module-info"><h3>Minería WebDollar</h3><p>Motor PoW/PoS Mainnet · fallo aislado del Core</p></div><span id="mining-status-text" class="module-status">Listo al conectar</span></article><article class="module-row"><div class="module-icon nfc-icon">⌁</div><div class="module-info"><h3>Pago offline</h3><p>Transacción firmada · intercambio QR</p></div><button id="offline-module-action" class="text-button">Abrir →</button></article></div></section>
+        <section class="panel activity-panel"><div class="panel-heading"><div><span class="panel-kicker">ESTADO DE OPERACIONES</span><h2>Actividad de esta sesión</h2></div></div><div id="activity-list" class="activity-list"><div class="empty-state">Tus operaciones aparecerán aquí.</div></div></section>
+      </div>
+    </section>
+    <aside class="side-rail">
+      <div class="rail-card security-card"><div class="rail-label">◇ FIRMA LOCAL</div><h3>Tus claves,<br><em>solo tuyas.</em></h3><p>La firma Ed25519 ocurre en tu dispositivo. La clave privada se retira de memoria al bloquear la cartera.</p><div class="security-line"><span></span><span></span><span></span><b>LOCAL</b></div></div>
+      <div class="rail-card offline-card"><div class="rail-label">⊙ SIN CONEXIÓN</div><h3>Pago offline</h3><p>Transporta un pago firmado por QR. Se liquida cuando la cadena acepta la transacción.</p><button id="offline-open" class="button button-light button-wide">Intercambiar vale →</button></div>
+      <div class="rail-note"><span>i</span><p>El saldo proviene de un nodo externo. Esta PWA no verifica el consenso como un nodo completo.</p></div>
+      <a class="text-button" href="USER_MANUAL.md">Manual de usuario ↗</a>
+    </aside>
+  </main>
+  <footer class="footer"><span>WEBDOLLAR WALLET / v2.0</span><span>Core modular · PWA instalable</span></footer>
+</div>
+<div id="toast-region" class="toast-region" aria-live="polite"></div>
+
+<dialog id="send-dialog" class="modal"><div class="modal-top"><span class="panel-kicker">REVISAR OPERACIÓN</span><button class="modal-close" data-close="send-dialog" aria-label="Cerrar">×</button></div><h2>Confirma el envío</h2><div class="confirm-card"><span>Destino completo</span><strong id="confirm-recipient"></strong><span>Débito total</span><strong id="confirm-debit"></strong><span>Monto a recibir</span><strong id="confirm-receive-amount" class="confirm-amount"></strong></div><div id="policy-issues" class="policy-issues"></div><p id="send-status" class="modal-status" role="status" aria-live="polite"></p><p class="modal-note">La confirmación firma y transmite el pago al nodo Mainnet. El estado inicial requiere verificar después si entró en mempool o en un bloque.</p><button id="confirm-send" class="button button-primary button-wide">Confirmar Envío</button></dialog>
+
+<dialog id="offline-dialog" class="modal modal-wide"><div class="modal-top"><span class="panel-kicker">PAGO OFFLINE / QR</span><button class="modal-close" data-close="offline-dialog" aria-label="Cerrar">×</button></div><h2>Intercambia un pago firmado</h2><p>Necesitas una consulta reciente del saldo y nonce. El vale no reserva fondos en la cadena y puede caducar o entrar en conflicto con otro pago.</p><div class="offline-form-grid"><div><label for="offline-recipient">Dirección de quien recibe</label><input id="offline-recipient" placeholder="WEBD$..." autocomplete="off"><label for="offline-amount">Monto total</label><div class="amount-input"><input id="offline-amount" inputmode="decimal" placeholder="0.00"><span>WEBD</span></div><button id="create-voucher" class="button button-primary button-wide">Generar y firmar vale</button><label for="offline-payload">Vale firmado</label><textarea id="offline-payload" rows="5" placeholder="Pega aquí el vale de la otra instancia"></textarea><div class="offline-actions"><button id="copy-voucher" class="button button-secondary">Copiar</button><button id="receive-voucher" class="button button-secondary">Validar recepción</button></div><label class="file-picker button button-secondary button-wide" for="qr-file">Simular NFC · Leer imagen QR</label><input id="qr-file" type="file" accept="image/*" capture="environment" hidden><button id="claim-voucher" class="button button-primary button-wide">Revisar reclamo Mainnet</button></div><div class="voucher-preview"><div class="qr-frame qr-offline"><img id="offline-qr" alt="QR del vale firmado" hidden></div><span id="voucher-state" class="voucher-state">Sin vale activo</span></div></div></dialog>
+
+<dialog id="recovery-dialog" class="modal"><div class="modal-top"><span class="panel-kicker">RESPALDO LOCAL</span><button class="modal-close" data-close="recovery-dialog" aria-label="Cerrar">×</button></div><h2>Guarda tu frase</h2><p>Esta frase de 24 palabras recupera la cartera en esta PWA. Exporta también el archivo .webd para usar el cliente oficial.</p><div id="mnemonic-words" class="mnemonic-grid"></div><button id="confirm-recovery" class="button button-primary button-wide">He guardado la frase</button></dialog>
+<dialog id="input-dialog" class="modal"><div class="modal-top"><span class="panel-kicker">CARTERA</span><button class="modal-close" data-close="input-dialog" aria-label="Cerrar">×</button></div><h2 id="input-title">Consultar dirección</h2><form id="input-form"><label for="input-value" id="input-label">Dirección WebDollar</label><textarea id="input-value" rows="4" autocomplete="off" spellcheck="false" required></textarea><button class="button button-primary button-wide" type="submit">Continuar</button></form></dialog>
+<script type="module" src="src/app.js"></script>
+</body></html>

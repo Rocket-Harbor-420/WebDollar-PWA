@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-09-05T11:07:11.4578996Z",
+  "kind": "human-confirmed-mainnet-transaction",
+  "endpoint": "https://pool.timi.ro",
+  "txId": "7678126f386472a7e459b1ac4698ae68df3c381ca78446d5c5c7abe73f9555f7",
+  "nodeExists": {
+    "result": true,
+    "height": 5970546
+  },
+  "pendingObjectAfterConfirmation": {},
+  "input": {
+    "enteredAmountWebd": 20,
+    "recipientWebd": 10,
+    "fixedTreasuryFeeWebd": 10,
+    "minerDifferenceWebd": 9.686,
+    "totalDebitWebd": 29.686
+  },
+  "balanceAfterWebd": 237.628,
+  "nonceAfter": 2,
+  "humanConfirmedInBrowser": true,
+  "privateWalletAccessedByProbe": false,
+  "transactionsBroadcastByVerification": 0
+}
