@@ -3,9 +3,10 @@
  *
  * Este adaptador solo habla con un endpoint de Marketplace que anuncie de
  * forma explícita el protocolo `webdollar-marketplace-v1`. No crea listados
- * locales, no guarda ofertas en localStorage y no convierte una firma en una
- * venta: el nodo debe aceptar y devolver la operación antes de considerarla
- * transmitida.
+ * locales ni convierte una firma en una venta: el nodo debe aceptar y devolver
+ * la operación antes de considerarla transmitida. Si el transporte cae después
+ * de una confirmación humana, conserva la orden firmada en memoria como
+ * pendiente de red; nunca la presenta como transmitida.
  */
 const DEFAULT_EXPLORER='https://webdollar.cloudns.nz/api';
 const ORDER_FORMAT='webdollar-market-order-v1';
@@ -56,9 +57,36 @@ function normalizeListing(listing){
   const id=normalizeText(listing.id??listing.listingId,'Listing ID',160);
   return {id,listingId:id,assetId:normalizeText(listing.assetId,'Asset ID'),amount:normalizeAmount(listing.amount),price:normalizePrice(listing.price),seller:normalizeText(listing.seller??listing.owner,'Vendedor',160),status:String(listing.status||'active')};
 }
+function pendingId(){
+  return globalThis.crypto?.randomUUID?.()||`pending-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+}
+function isTransportFailure(error){
+  return error?.name==='AbortError'||error?.status===408||error?.status===429||Number(error?.status)>=500||!Number.isInteger(error?.status);
+}
+function clone(value){return typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value));}
+function queueOperation(module,kind,signedOrder){
+  const operation={id:pendingId(),kind,order:clone(signedOrder),queuedAt:new Date().toISOString(),status:'pending-network'};
+  module.pendingOperations.push(operation);
+  module.core?.events.emit('marketplace:queued',clone(operation));
+  return {status:'queued',queued:true,pendingId:operation.id};
+}
+async function postOrder(module,kind,signedOrder){
+  const path=kind==='listing'?'/marketplace/listings':'/marketplace/purchases';
+  const response=await requestJson(module.apiBase+path,{method:'POST',body:{order:signedOrder}});
+  if(kind==='listing'){
+    if(!response.listing||!response.listing.id)throw new Error('El nodo no confirmó la publicación del listado.');
+    const listing=normalizeListing(response.listing);
+    module.listings=[listing,...module.listings.filter(item=>item.id!==listing.id)];
+    module.core?.events.emit('marketplace:listing',clone(response.listing));
+  }else{
+    if(!response.purchaseId&&!response.txId&&!response.status)throw new Error('El nodo no confirmó la compra.');
+    module.core?.events.emit('marketplace:purchase',clone(response));
+  }
+  return response;
+}
 export const marketplaceModule={
-  id:'marketplace',name:'Mercado WebDollar',core:null,connected:false,endpoint:null,apiBase:null,assetProtocolSupported:false,assets:[],listings:[],lastError:null,lastMessage:'',
-  init(core){this.core=core;this.connected=false;this.endpoint=null;this.apiBase=null;this.assetProtocolSupported=false;this.assets=[];this.listings=[];this.lastError=null;this.lastMessage='';},
+  id:'marketplace',name:'Mercado WebDollar',core:null,connected:false,endpoint:null,apiBase:null,assetProtocolSupported:false,assets:[],listings:[],pendingOperations:[],lastError:null,lastMessage:'',
+  init(core){this.core=core;this.connected=false;this.endpoint=null;this.apiBase=null;this.assetProtocolSupported=false;this.assets=[];this.listings=[];this.pendingOperations=[];this.lastError=null;this.lastMessage='';},
   async connect(endpoint=this.core?.getNetworkSource?.()||DEFAULT_EXPLORER){
     this.endpoint=normalizeEndpoint(endpoint);this.apiBase=this.endpoint;this.lastError=null;this.lastMessage='';
     try{
@@ -102,34 +130,47 @@ export const marketplaceModule={
     this.listings=response.listings.map(normalizeListing);return this.listings.slice();
   },
   listAssetForSale(assetId,amount,price){
-    if(!this.assetProtocolSupported)throw protocolError();
     const data={operation:'list',assetId:normalizeText(assetId,'Asset ID'),amount:normalizeAmount(amount),price:normalizePrice(price)};
+    if(this.connected&&!this.assetProtocolSupported)throw protocolError();
     const signer=globalThis.window?.webdollarCore?.signMarketplaceOrder||this.core?.signMarketplaceOrder;
     if(!signer)throw new Error('El Core no expone el hook de firma del Marketplace.');
     return signer(data);
   },
   buyAsset(listingId){
-    if(!this.assetProtocolSupported)throw protocolError();
     const listing=this.listings.find(item=>item.id===String(listingId));
     if(!listing)throw new Error('El listado ya no está disponible; actualiza el mercado.');
+    if(this.connected&&!this.assetProtocolSupported)throw protocolError();
     const signer=globalThis.window?.webdollarCore?.signMarketplaceOrder||this.core?.signMarketplaceOrder;
     if(!signer)throw new Error('El Core no expone el hook de firma del Marketplace.');
     return signer({operation:'buy',listingId:listing.id,assetId:listing.assetId,amount:listing.amount,price:listing.price,seller:listing.seller});
   },
+  getPendingOperations(){return clone(this.pendingOperations);},
   async submitListing(signedOrder){
-    if(!this.assetProtocolSupported)throw protocolError();
     if(!signedOrder?.signature||signedOrder.operation!=='list'||signedOrder.format!==ORDER_FORMAT)throw new Error('Orden de venta firmada inválida.');
-    const response=await requestJson(this.apiBase+'/marketplace/listings',{method:'POST',body:{order:signedOrder}});
-    if(!response.listing||!response.listing.id)throw new Error('El nodo no confirmó la publicación del listado.');
-    this.listings=[normalizeListing(response.listing),...this.listings.filter(item=>item.id!==response.listing.id)];
-    this.core?.events.emit('marketplace:listing',response.listing);return response;
+    if(!this.connected)return queueOperation(this,'listing',signedOrder);
+    if(!this.assetProtocolSupported)throw protocolError();
+    try{return await postOrder(this,'listing',signedOrder);}catch(error){if(!isTransportFailure(error))throw error;return queueOperation(this,'listing',signedOrder);}
   },
   async submitPurchase(signedOrder){
-    if(!this.assetProtocolSupported)throw protocolError();
     if(!signedOrder?.signature||signedOrder.operation!=='buy'||signedOrder.format!==ORDER_FORMAT)throw new Error('Orden de compra firmada inválida.');
-    const response=await requestJson(this.apiBase+'/marketplace/purchases',{method:'POST',body:{order:signedOrder}});
-    if(!response.purchaseId&&!response.txId&&!response.status)throw new Error('El nodo no confirmó la compra.');
-    this.core?.events.emit('marketplace:purchase',response);return response;
+    if(!this.connected)return queueOperation(this,'purchase',signedOrder);
+    if(!this.assetProtocolSupported)throw protocolError();
+    try{return await postOrder(this,'purchase',signedOrder);}catch(error){if(!isTransportFailure(error))throw error;return queueOperation(this,'purchase',signedOrder);}
   },
-  getState(){return {connected:this.connected,endpoint:this.endpoint,assetProtocolSupported:this.assetProtocolSupported,assets:this.assets.slice(),listings:this.listings.slice(),lastError:this.lastError,lastMessage:this.lastMessage};}
+  async retryPending(){
+    if(!this.connected||!this.assetProtocolSupported)return {attempted:0,transmitted:0,pending:this.getPendingOperations()};
+    const pending=[...this.pendingOperations],transmitted=[];
+    for(const operation of pending){
+      try{
+        const response=await postOrder(this,operation.kind,operation.order);
+        this.pendingOperations=this.pendingOperations.filter(item=>item.id!==operation.id);
+        transmitted.push({pendingId:operation.id,response});
+      }catch(error){
+        if(!isTransportFailure(error))this.lastError=error?.message||String(error);
+        break;
+      }
+    }
+    return {attempted:pending.length,transmitted:transmitted.length,pending:this.getPendingOperations(),transmittedItems:transmitted};
+  },
+  getState(){return {connected:this.connected,endpoint:this.endpoint,assetProtocolSupported:this.assetProtocolSupported,assets:this.assets.slice(),listings:this.listings.slice(),pendingOperations:this.getPendingOperations(),lastError:this.lastError,lastMessage:this.lastMessage};}
 };

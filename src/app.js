@@ -125,6 +125,12 @@ function renderMarketplaceConnection(result){
   node.textContent=!result?.connected?t('marketplace.connectError'):result.assetProtocolSupported?t('marketplace.connected'):t('marketplace.protocolUnavailable');
   node.classList.toggle('is-error',!result?.connected||!result?.assetProtocolSupported);
 }
+function renderMarketplacePending(){
+  const pending=marketplaceModule.getPendingOperations();
+  const retry=$('#marketplace-retry');
+  retry.disabled=pending.length===0;
+  $('#marketplace-pending-status').textContent=pending.length?t('marketplace.pendingCount',{count:pending.length}):'';
+}
 function renderHistory(history){
   const list=$('#activity-list');list.replaceChildren();
   if(!history.length){const empty=document.createElement('div');empty.className='empty-state';empty.textContent=t('activity.empty');list.append(empty);return;}
@@ -258,15 +264,26 @@ action('#marketplace-open',async()=>{
   $('#marketplace-panel').hidden=false;
   const result=await marketplaceModule.connect();
   renderMarketplaceConnection(result);
+  renderMarketplacePending();
   if(result.connected)await refreshMarketplace();
 });
 action('#marketplace-close',()=>{$('#marketplace-panel').hidden=true;close('marketplace-dialog');});
 action('#marketplace-connect',async()=>{
   const result=await marketplaceModule.connect();
   renderMarketplaceConnection(result);
+  renderMarketplacePending();
   if(result.connected)await refreshMarketplace();
 });
 action('#marketplace-refresh',async()=>refreshMarketplace());
+action('#marketplace-retry',async()=>{
+  let connection=marketplaceModule.getState();
+  if(!connection.connected){connection=await marketplaceModule.connect();renderMarketplaceConnection(connection);}
+  if(!connection.assetProtocolSupported){renderMarketplacePending();return;}
+  const result=await marketplaceModule.retryPending();
+  renderMarketplacePending();
+  if(result.transmitted)toast(t('marketplace.retryResult',{count:result.transmitted}));
+  await refreshMarketplace();
+});
 $('#marketplace-list-form').addEventListener('submit',event=>{
   event.preventDefault();
   try{
@@ -280,9 +297,10 @@ action('#confirm-marketplace',async event=>{
   try{
     const signed=wallet.signMarketplaceOrder(operation.data,{confirmed:true});
     const result=operation.data.operation==='buy'?await marketplaceModule.submitPurchase(signed):await marketplaceModule.submitListing(signed);
-    const reference=result.listing?.id||result.purchaseId||result.txId||'Mainnet';
-    $('#marketplace-list-status').textContent=t('marketplace.transmitted',{reference});
-    close('marketplace-dialog');await refreshMarketplace();toast(t('marketplace.transmitted',{reference}));
+    const reference=result.listing?.id||result.purchaseId||result.txId||result.pendingId||'Mainnet';
+    const message=result.queued?t('marketplace.queued',{reference}):t('marketplace.transmitted',{reference});
+    $('#marketplace-list-status').textContent=message;
+    close('marketplace-dialog');renderMarketplacePending();if(!result.queued)await refreshMarketplace();toast(message);
   }catch(error){
     $('#marketplace-confirm-status').textContent=error.message||t('marketplace.orderError');$('#marketplace-confirm-status').classList.add('is-error');toast(error.message||t('marketplace.orderError'),true);
   }finally{broadcastBusy=false;setBusy($('#confirm-marketplace'),false);}

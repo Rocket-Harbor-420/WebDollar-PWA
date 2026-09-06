@@ -19,12 +19,19 @@ const MARKETPLACE_MESSAGES={
   ro:{'marketplace.protocolUnavailable':'Nodul nu anunță protocolul Marketplace Mainnet','marketplace.amount':'Cantitate','marketplace.amountPlaceholder':'1.00','marketplace.buy':'Cumpără','marketplace.seller':'Vânzător','marketplace.transmitted':'Operație acceptată de Mainnet: {reference}','marketplace.intro':'Consultă activele și pregătește ordine pe care nodul Marketplace Mainnet le poate valida. Fără un protocol anunțat, aplicația nu semnează și nu transmite operațiuni fictive.','marketplace.comingSoon':'Tokenurile apar când nodul anunță API-ul Assets.','marketplace.reviewTitle':'Confirmă operațiunea','marketplace.reviewCopy':'Ordinul va fi semnat local și trimis către endpointul Marketplace Mainnet numai după confirmarea ta.','marketplace.confirm':'Confirmă, semnează și transmite'},
   'zh-CN':{'marketplace.protocolUnavailable':'节点未公布主网市场协议','marketplace.amount':'数量','marketplace.amountPlaceholder':'1.00','marketplace.buy':'购买','marketplace.seller':'卖家','marketplace.transmitted':'主网已接受操作：{reference}','marketplace.intro':'查询资产并准备可由主网市场节点验证的订单。节点未公布协议时，应用不会签名或发送虚构操作。','marketplace.comingSoon':'节点公布 Assets API 后，代币才会显示。','marketplace.reviewTitle':'确认操作','marketplace.reviewCopy':'订单将在本地签名，并且只有在你确认后才会发送到主网市场端点。','marketplace.confirm':'确认、签名并发送'}
 };
+const MARKETPLACE_QUEUE_MESSAGES={
+  es:{'marketplace.queued':'Orden firmada guardada para reintento de red: {reference}','marketplace.pendingCount':'Pendientes de red: {count}','marketplace.retryPending':'Reintentar pendientes','marketplace.retryResult':'Transmitidas: {count}'},
+  en:{'marketplace.queued':'Signed order saved for a network retry: {reference}','marketplace.pendingCount':'Network pending: {count}','marketplace.retryPending':'Retry pending orders','marketplace.retryResult':'Transmitted: {count}'},
+  it:{'marketplace.queued':'Ordine firmato salvato per un nuovo tentativo di rete: {reference}','marketplace.pendingCount':'In attesa di rete: {count}','marketplace.retryPending':'Riprova ordini in attesa','marketplace.retryResult':'Trasmessi: {count}'},
+  ro:{'marketplace.queued':'Ordin semnat salvat pentru o nouă încercare de rețea: {reference}','marketplace.pendingCount':'În așteptarea rețelei: {count}','marketplace.retryPending':'Reîncearcă ordinele în așteptare','marketplace.retryResult':'Transmise: {count}'},
+  'zh-CN':{'marketplace.queued':'已保存签名订单，等待网络重试：{reference}','marketplace.pendingCount':'等待网络：{count}','marketplace.retryPending':'重试待处理订单','marketplace.retryResult':'已发送：{count}'}
+};
 
 function interpolate(value,params={}){
   return String(value).replace(/\{(\w+)\}/g,(_,key)=>params[key]===undefined?`{${key}}`:String(params[key]));
 }
 export function getLanguage(){return language;}
-export function t(key,params={}){return interpolate(messages[key]??MARKETPLACE_MESSAGES[language]?.[key]??key,params);}
+export function t(key,params={}){return interpolate(messages[key]??MARKETPLACE_MESSAGES[language]?.[key]??MARKETPLACE_QUEUE_MESSAGES[language]?.[key]??key,params);}
 export function getTheme(){return theme;}
 export function effectiveTheme(){return theme==='system'&&themeMediaQuery?themeMediaQuery.matches?'dark':'light':theme;}
 export function applyTheme(){

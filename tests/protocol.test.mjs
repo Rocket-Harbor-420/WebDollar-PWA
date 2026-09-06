@@ -222,6 +222,18 @@ test('marketplace uses the public review hook and signs only after confirmation'
   }finally{globalThis.fetch=originalFetch;}
 });
 
+test('marketplace keeps a human-confirmed order pending when no node is available',async()=>{
+  const events=new EventBus(),wallet=new WalletCore(events,{subscribeBalance(){return ()=>{};},async getSnapshot(){return fixtureSnapshot(fixtureAccount().address);}});
+  await wallet.importFile(fixtureFile());
+  marketplaceModule.init({events,getAddress:()=>wallet.getAddress(),getBalance:()=>333});
+  const signed=wallet.signMarketplaceOrder({operation:'list',assetId:'ASSET-001',amount:'1',price:'25'},{confirmed:true});
+  const result=await marketplaceModule.submitListing(signed);
+  assert.equal(result.status,'queued');assert.equal(result.queued,true);assert.ok(result.pendingId);
+  assert.equal(marketplaceModule.getPendingOperations().length,1);
+  const retry=await marketplaceModule.retryPending();
+  assert.equal(retry.attempted,0);assert.equal(retry.transmitted,0);assert.equal(retry.pending.length,1);
+});
+
 test('native WebDollar Socket.IO packets are deterministic',()=>{
   assert.equal(socketEventPacket('api/top',{}),'42["api/top",{}]');
   assert.match(socketBinaryEventPacket('transactions/new-pending-transaction',1),/^451-/);
