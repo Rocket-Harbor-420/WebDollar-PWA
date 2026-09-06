@@ -1,4 +1,4 @@
-# WebDollar Wallet · PWA Mainnet v2
+# WebDollar Wallet · PWA Mainnet v3
 
 PWA ejecutable con importación oficial .webd, firma Ed25519 local, consulta REST, transacciones serializadas WebDollar v2, transporte offline por QR/NFC, interfaz en cinco idiomas, tema adaptativo, instalación standalone y build TWA para Android.
 
@@ -31,6 +31,7 @@ Visita http://127.0.0.1:4173. El paquete contiene las dependencias del navegador
 | Copia cifrada | AES-256-GCM + PBKDF2-SHA-256 para exportación `.encrypted.webd`, con roundtrip probado |
 | Métricas de minería | Aceptados, rechazados, latencia, uptime, trabajos e intentos en memoria de sesión |
 | Mensajería | Deep links para compartir dirección y vale por WhatsApp, Telegram y Messenger |
+| Marketplace | Adaptador Mainnet real: consulta Assets/listados y firma/transmite solo cuando el nodo anuncia `webdollar-marketplace-v1` |
 | Doble gasto offline | Sobre v2 con nonce, +100 bloques de caducidad, deduplicación en sesión y verificación on-chain oportunista |
 | PWA | Service Worker e iconos PNG; instalabilidad comprobada en Chrome |
 | APK | APK debug local compilado y verificado; TWA release requiere dominio HTTPS y firma |
@@ -81,6 +82,12 @@ Para preparar un vale desde una consola sin transmitirlo se puede ejecutar `npm 
 
 src/modules/mining.js proporciona startMining, stopMining, getHashRate y attachWorkerEngine. El motor incluido implementa el protocolo de pool oficial: `src/workers/mining-pow-worker.js` ejecuta Argon2d para trabajos PoW históricos y el módulo calcula la prueba PoS vigente, firmando únicamente la cabecera mediante `WalletCore.signPoSHeader`. Ningún worker recibe la clave privada. Si el pool no entrega trabajo o cierra el canal, el PluginManager desactiva el módulo sin afectar al saldo.
 
+## Marketplace WebDollar (v3.0)
+
+`src/modules/marketplace.js` está registrado como plugin independiente. Consulta una fuente Mainnet y expone el activo nativo WEBD. Para tokens y listados exige que el endpoint responda a `GET /marketplace/capabilities` con `protocol: "webdollar-marketplace-v1"`, `network: "mainnet"`, `assets: true` y `listings: true`. En ese caso consulta `/address/assets`, `/marketplace/listings`, y transmite órdenes firmadas mediante `POST /marketplace/listings` y `POST /marketplace/purchases`. El formulario nunca recibe ni lee la clave privada: llama a `window.webdollarCore.signMarketplaceOrder(data)`, abre una revisión humana y el Core firma únicamente después del clic real de confirmación. No existe almacenamiento ni listado local de respaldo.
+
+El repositorio oficial [WebDollar/webdollar2](https://github.com/WebDollar/webdollar2) declara que está “Under development. Not working right now” y sus documentos de Assets describen comandos de investigación, no un endpoint Mainnet estable. Por eso esta versión no inventa un contrato ni presenta un activo ficticio como liquidado: en el Mainnet actual el módulo muestra WEBD, marca el protocolo como no anunciado y bloquea listar/comprar sin firmar. Cuando un nodo publique el contrato verificable, el adaptador podrá transmitirlo sin tocar `WalletCore`. La interfaz y los tipos del módulo están documentados en `API_CORE.md` e `src/core/interfaces.d.ts`.
+
 ## Pruebas
 
 ```powershell
@@ -119,15 +126,15 @@ npm run build:apk:local
 El resultado es `WebDollar-wallet-debug.apk`. En esta ejecución se generó y verificó:
 
 ```text
-SHA-256: 75F5F254ED4A7C9A18E1D7A8372B686BD456B477CB35601DF60A1DC85167EEF7
+SHA-256: AE0516B547C358AC3232ED40F3043D00495FACAC7442DE05BA0C8165AE47E254
 Package: com.webdollar.wallet
-Version: 2.0.0 (20)
+Version: 3.0.0 (30)
 ```
 
 El build local también genera `build/release/WebDollar-wallet-debug.aab` con firma debug para pruebas internas:
 
 ```text
-SHA-256: B712F509590C00268DA50E10713AB15086F33E43F90D802EF6AB84AC977C1007
+SHA-256: 1C76EA0440B381549CF769EF6E3E83BD74ED280F5F225CAFC2760183BA8A7F6D
 ```
 
 El APK/AAB local no incluye claves ni carteras. La PWA sigue exigiendo que el usuario seleccione el archivo `.webd` y confirme cualquier transmisión. La firma de depuración no debe utilizarse para publicar una versión de producción.
@@ -162,7 +169,7 @@ El selector ofrece Español, English, Italiano, Română y 简体中文. Guarda 
 
 En Android Chrome con Web NFC habilitado, `Enviar por NFC` escribe el vale firmado como un registro de texto NDEF y `Leer NFC` recupera y valida el prefijo `webd-pay-v1:`. Los vales nuevos llevan dentro un sobre `webdollar-ecash-v2` con nonce secuencial, expiración a +100 bloques y registro de uso en memoria. Si hay red, se consulta la cadena antes de aceptar; la validación no acredita saldo y el reclamo sigue requiriendo revisión y confirmación. En navegadores sin Web NFC, `Leer imagen QR` es el fallback funcional. El registro offline se pierde al cerrar la sesión y no puede reemplazar el consenso contra doble gasto en otra cartera.
 
-**Preparación futura desacoplada:** `src/modules/custom-nodes.js` valida identidad Mainnet, mantiene nodos como solo lectura y expone health checks antes de firmar. `src/core/interfaces.d.ts` contiene contratos para adaptadores de otras redes/activos y para Ledger WebUSB/WebHID. El diseño de marketplace WebDollar, hardware wallet y pools extendidos está en `PROPOSALS.md`; ninguno modifica el Core en esta entrega.
+**Preparación desacoplada:** `src/modules/custom-nodes.js` valida identidad Mainnet, mantiene nodos como solo lectura y expone health checks antes de firmar. `src/core/interfaces.d.ts` contiene contratos para adaptadores de otras redes/activos y para Ledger WebUSB/WebHID. El Marketplace v3.0 está implementado como adaptador real con bloqueo seguro cuando el protocolo no existe; las siguientes extensiones de activos, hardware wallet y pools siguen documentadas en `PROPOSALS.md` sin modificar el Core.
 
 Comprobar los comandos sin compilar ni descargar herramientas:
 
@@ -179,4 +186,4 @@ El banner de instalación PWA depende del navegador, uso previo y políticas del
 - architecture.mermaid: módulos, claves, UI, red y transporte QR.
 - PROTOCOL_EVIDENCE.md: fuentes técnicas y límites de aceptación.
 - VALIDATION.md: resultados y verificaciones pendientes.
-- PROPOSALS.md: diseño marketplace, Ledger WebUSB/WebHID, nodos, activos/redes y pools para futuras versiones.
+- PROPOSALS.md: estado implementado del Marketplace y evolución de Ledger WebUSB/WebHID, nodos, activos/redes y pools.

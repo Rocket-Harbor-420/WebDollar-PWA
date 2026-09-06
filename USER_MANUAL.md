@@ -63,6 +63,16 @@ El botón de minería inicia el módulo aislado de trabajo PoW/PoS Mainnet. El P
 
 Si el módulo falla, la cartera conserva la dirección y el saldo consultado. El fallo aparece como No disponible; el resto de la interfaz permanece operativo.
 
+## Mercado WebDollar: Assets y ofertas Mainnet
+
+1. Importa la cartera y consulta un nodo Mainnet. Pulsa **Mercado** para abrir la sección.
+2. La PWA consulta primero el nodo/explorador y solicita `GET /marketplace/capabilities`. Solo continúa si la respuesta anuncia `webdollar-marketplace-v1`, `network: mainnet`, Assets y listados.
+3. Cuando el protocolo está disponible, **Tus activos** consulta `/address/assets` y **Explorar listados** consulta `/marketplace/listings`. La aplicación no agrega ejemplos locales ni guarda ofertas en el navegador.
+4. Para vender, introduce Asset ID, cantidad y precio. Pulsa **Listar activo** y revisa el diálogo. El clic explícito **Confirmar, firmar y transmitir** es el único paso que permite firmar; después la orden se envía a `/marketplace/listings` y la UI espera el acuse del nodo.
+5. Para comprar, pulsa **Comprar** junto a un listado obtenido del nodo. Revisa el identificador, cantidad, vendedor y precio; confirma para firmar y transmitir a `/marketplace/purchases`.
+
+El repositorio oficial WebDollar2 aún describe su código como “Under development. Not working right now” y no publica un endpoint Mainnet estable de Assets/Marketplace. Por eso, con los nodos WebDollar Mainnet actuales, la sección muestra el saldo WEBD real y el estado **El nodo no anuncia el protocolo Marketplace Mainnet**; **Listar activo** y **Comprar** se bloquean antes de firmar. Esta respuesta es intencional: evita crear una firma o un listado local que no pueda liquidarse en la blockchain.
+
 ## Bloquear
 
 Pulsa el icono de bloqueo. Se detiene la consulta periódica y se sobrescribe el array de clave privada de la sesión. La dirección y la última consulta siguen visibles. Importa de nuevo para firmar. Cerrar o recargar también elimina la sesión; esta versión no persiste vales ni historial.

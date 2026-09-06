@@ -14,6 +14,7 @@ import { miningModule } from './modules/mining.js';
 import { offlineModule } from './modules/offline.js';
 import { messengerModule } from './modules/messenger.js';
 import { customNodesModule } from './modules/custom-nodes.js';
+import { marketplaceModule } from './modules/marketplace.js';
 import { initLanguage, loadLanguage, getLanguage, applyTranslations, t, initTheme, loadTheme, getTheme } from './core/i18n.js';
 
 const $=selector=>document.querySelector(selector);
@@ -26,7 +27,7 @@ function toast(message,error=false){
 const localeMap={es:'es-MX',en:'en-US',it:'it-IT',ro:'ro-RO','zh-CN':'zh-CN'};
 const fmt=value=>value===null||value===undefined?'—':Number(value).toLocaleString(localeMap[getLanguage()]||'es-MX',{minimumFractionDigits:2,maximumFractionDigits:4});
 function open(id){const dialog=$('#'+id);if(!dialog.open)dialog.showModal();}
-function close(id){$('#'+id).close();if(id==='recovery-dialog')$('#mnemonic-words').replaceChildren();if(id==='input-dialog')$('#input-value').value='';if(id==='send-dialog')pending=null;}
+function close(id){$('#'+id).close();if(id==='recovery-dialog')$('#mnemonic-words').replaceChildren();if(id==='input-dialog')$('#input-value').value='';if(id==='send-dialog'||id==='marketplace-dialog')pending=null;}
 async function copy(value){if(!value)throw new Error(t('toast.noCopy'));await navigator.clipboard.writeText(value);toast(t('toast.copied'));}
 function action(selector,handler){$(selector).addEventListener('click',async event=>{try{await handler(event);}catch(error){toast(error.message,true);}});}
 function setBusy(button,busy){button.disabled=busy;button.setAttribute('aria-busy',String(busy));}
@@ -42,6 +43,18 @@ function requestClaim(base64){
   if(tx.to!==wallet.getAddress())throw new Error('El vale pertenece a otra dirección.');
   pending={kind:'claim',base64,quote:tx};close('offline-dialog');showReview(tx);return {reviewRequired:true,txId:tx.txId};
 }
+function requestMarketplaceOrder(data){
+  if(pending||broadcastBusy)throw new Error(t('errors.reviewBusy'));
+  const input=Object.freeze({operation:data?.operation==='buy'?'buy':'list',assetId:String(data?.assetId||''),amount:String(data?.amount??''),price:String(data?.price??''),listingId:String(data?.listingId||''),seller:String(data?.seller||'')});
+  pending={kind:'marketplace',data:input};
+  $('#marketplace-confirm-operation').textContent=input.operation==='buy'?t('marketplace.buy'):t('marketplace.listTitle');
+  $('#marketplace-confirm-asset').textContent=input.operation==='buy'?input.listingId:input.assetId;
+  $('#marketplace-confirm-price').textContent=input.amount+' · '+input.price+' WEBD';
+  $('#marketplace-confirm-seller').textContent=input.seller||wallet.getAddress()||'—';
+  $('#marketplace-confirm-status').textContent='';
+  open('marketplace-dialog');
+  return {reviewRequired:true,...input};
+}
 function showReview(quote){
   $('#confirm-recipient').textContent=quote.to;
   $('#confirm-debit').textContent=fmt(quote.totalDebit)+' WEBD';
@@ -55,14 +68,14 @@ function showReview(quote){
 }
 const hooks=Object.freeze({
   getAddress:()=>wallet.getAddress(),getBalance:()=>wallet.getBalance(),getSnapshot:()=>wallet.publicState().snapshot,getNetworkSource:()=>network.activeEndpoint,signPoSHeader:header=>wallet.signPoSHeader(header),checkTransaction:txId=>wallet.checkTransaction(txId),events,
-  prepareOffline:data=>wallet.prepareOffline(data),receiveSigned:bytes=>wallet.receiveSigned(bytes),requestClaim
+  prepareOffline:data=>wallet.prepareOffline(data),receiveSigned:bytes=>wallet.receiveSigned(bytes),requestClaim,signMarketplaceOrder:requestMarketplaceOrder
 });
 const plugins=new PluginManager(hooks,events);
-plugins.register(miningModule);plugins.register(offlineModule);plugins.register(messengerModule);plugins.register(customNodesModule);
+plugins.register(miningModule);plugins.register(offlineModule);plugins.register(messengerModule);plugins.register(customNodesModule);plugins.register(marketplaceModule);
 window.webdollarCore=Object.freeze({
   getBalance:()=>wallet.getBalance(),getAddress:()=>wallet.getAddress(),getState:()=>wallet.publicState(),
   // Public send hook opens human review. It cannot silently broadcast.
-  sendTransaction:requestSend,events,
+  sendTransaction:requestSend,signMarketplaceOrder:requestMarketplaceOrder,events,
   registerModule:module=>plugins.register(module),initializeModule:id=>plugins.initialize(id),
   getModules:()=>plugins.list(),attachMiningEngine:engine=>miningModule.attachEngine(engine),
   attachMiningEngineUrl:url=>miningModule.attachWorkerEngine(url)
@@ -74,11 +87,43 @@ function render(){
   if(!state.address)return;
   $('#full-address').textContent=state.address;setQr($('#qr-image'),null,state.address);
   $('#balance-value').textContent=fmt(state.balance);
+  $('#marketplace-balance').textContent=fmt(state.balance)+' WEBD';
   $('#balance-height').textContent=t('balance.height',{height:state.snapshot?.height?.toLocaleString(localeMap[getLanguage()]||'es-MX')||'—'});
   $('#balance-state').textContent=state.snapshot?(navigator.onLine===false?t('network.lastOffline'):state.snapshot.synchronized?t('network.sync'):t('network.stale')):t('network.noQuery');
   $('#balance-source').textContent=state.snapshot?t('balance.source',{source:state.snapshot.source,time:new Date(state.snapshot.fetchedAt).toLocaleTimeString()}):t('balance.source.none');
   $('#setup-title').textContent=state.locked?t('wallet.locked'):t('wallet.session');
   renderHistory(state.history);
+}
+function renderMarketplaceAssets(result){
+  const list=$('#marketplace-assets');list.replaceChildren();
+  if(!result?.assets?.length){const empty=document.createElement('p');empty.className='empty-state';empty.textContent=t('marketplace.assetsEmpty');list.append(empty);return;}
+  for(const asset of result.assets){
+    const row=document.createElement('div');row.className='marketplace-item';
+    const title=document.createElement('strong');title.textContent=asset.symbol||asset.id;
+    const value=document.createElement('span');value.textContent=(asset.name||asset.id)+' · '+(asset.balance??'—')+' WEBD';
+    row.append(title,value);list.append(row);
+  }
+}
+function renderMarketplaceListings(listings=[]){
+  const list=$('#marketplace-listings');list.replaceChildren();
+  if(!listings.length){const empty=document.createElement('p');empty.className='empty-state';empty.textContent=t('marketplace.listingsEmpty');list.append(empty);return;}
+  for(const listing of listings){
+    const row=document.createElement('div');row.className='marketplace-item';
+    const title=document.createElement('strong');title.textContent=listing.assetId+' · '+listing.amount;
+    const detail=document.createElement('span');detail.textContent=listing.price+' WEBD · '+listing.status;
+    const buy=document.createElement('button');buy.type='button';buy.className='text-button';buy.textContent=t('marketplace.buy');
+    buy.addEventListener('click',()=>{try{marketplaceModule.buyAsset(listing.id);}catch(error){toast(error.message,true);}});
+    row.append(title,detail,buy);list.append(row);
+  }
+}
+async function refreshMarketplace(){
+  const result=await marketplaceModule.fetchAssets(wallet.getAddress());
+  renderMarketplaceAssets(result);renderMarketplaceListings(await marketplaceModule.getListings());
+}
+function renderMarketplaceConnection(result){
+  const node=$('#marketplace-connection');
+  node.textContent=!result?.connected?t('marketplace.connectError'):result.assetProtocolSupported?t('marketplace.connected'):t('marketplace.protocolUnavailable');
+  node.classList.toggle('is-error',!result?.connected||!result?.assetProtocolSupported);
 }
 function renderHistory(history){
   const list=$('#activity-list');list.replaceChildren();
@@ -209,6 +254,39 @@ action('#share-address',()=>{messengerModule.shareAddress($('#share-address-plat
 action('#paste-recipient',async()=>$('#recipient').value=(await navigator.clipboard.readText()).trim());
 $('#amount').addEventListener('input',()=>$('#send-total').textContent=fmt(Number($('#amount').value))+' WEBD');
 $('#send-form').addEventListener('submit',event=>{event.preventDefault();try{requestSend({to:$('#recipient').value.trim(),amount:$('#amount').value.trim()});}catch(error){toast(error.message,true);}});
+action('#marketplace-open',async()=>{
+  $('#marketplace-panel').hidden=false;
+  const result=await marketplaceModule.connect();
+  renderMarketplaceConnection(result);
+  if(result.connected)await refreshMarketplace();
+});
+action('#marketplace-close',()=>{$('#marketplace-panel').hidden=true;close('marketplace-dialog');});
+action('#marketplace-connect',async()=>{
+  const result=await marketplaceModule.connect();
+  renderMarketplaceConnection(result);
+  if(result.connected)await refreshMarketplace();
+});
+action('#marketplace-refresh',async()=>refreshMarketplace());
+$('#marketplace-list-form').addEventListener('submit',event=>{
+  event.preventDefault();
+  try{
+    marketplaceModule.listAssetForSale($('#marketplace-asset-id').value.trim(),$('#marketplace-amount').value.trim(),$('#marketplace-price').value.trim());
+  }catch(error){toast(error.message||t('marketplace.orderError'),true);}
+});
+action('#confirm-marketplace',async event=>{
+  if(!event.isTrusted||!$('#marketplace-dialog').open||!pending||pending.kind!=='marketplace'||broadcastBusy)return;
+  const operation=pending;
+  broadcastBusy=true;setBusy($('#confirm-marketplace'),true);$('#marketplace-confirm-status').textContent=t('transaction.signing');$('#marketplace-confirm-status').classList.remove('is-error');
+  try{
+    const signed=wallet.signMarketplaceOrder(operation.data,{confirmed:true});
+    const result=operation.data.operation==='buy'?await marketplaceModule.submitPurchase(signed):await marketplaceModule.submitListing(signed);
+    const reference=result.listing?.id||result.purchaseId||result.txId||'Mainnet';
+    $('#marketplace-list-status').textContent=t('marketplace.transmitted',{reference});
+    close('marketplace-dialog');await refreshMarketplace();toast(t('marketplace.transmitted',{reference}));
+  }catch(error){
+    $('#marketplace-confirm-status').textContent=error.message||t('marketplace.orderError');$('#marketplace-confirm-status').classList.add('is-error');toast(error.message||t('marketplace.orderError'),true);
+  }finally{broadcastBusy=false;setBusy($('#confirm-marketplace'),false);}
+});
 action('#confirm-send',async event=>{
   if(!event.isTrusted||!$('#send-dialog').open||!pending||broadcastBusy)return;
   const operation=pending;
@@ -259,7 +337,7 @@ $('#qr-file').addEventListener('change',async()=>{
 });
 document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>close(button.dataset.close)));
 for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('close',()=>{
-  if(dialog.id==='send-dialog'&&!dialog.open)pending=null;
+  if((dialog.id==='send-dialog'||dialog.id==='marketplace-dialog')&&!dialog.open)pending=null;
   if(dialog.id==='recovery-dialog')$('#mnemonic-words').replaceChildren();
   if(dialog.id==='input-dialog')$('#input-value').value='';
 });

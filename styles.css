@@ -171,3 +171,29 @@ button, .button, .file-picker, summary { -webkit-user-select:none; user-select:n
   .amount-input input, input, textarea { min-width:0; }
   .language-control select { max-width:96px; }
 }
+
+/* Marketplace adapter: local order review with no private-key access in the UI module. */
+.marketplace-panel { margin-top:18px; }
+.marketplace-status-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0 18px; color:#587279; font-size:12px; }
+.marketplace-status-row #marketplace-connection.is-error { color:#9a432b; }
+.marketplace-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:17px; }
+.marketplace-card { min-width:0; padding:18px; border:1px solid var(--line); border-radius:10px; background:var(--paper); }
+.marketplace-card h3 { margin:0 0 10px; font-size:14px; }
+.marketplace-card > strong { display:block; margin-bottom:22px; color:var(--ink-2); font-size:24px; overflow-wrap:anywhere; }
+.marketplace-card form { display:grid; gap:8px; }
+.marketplace-card form label { margin-top:4px; }
+.marketplace-list { display:grid; gap:8px; }
+.marketplace-item { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); font-size:12px; }
+.marketplace-item:last-child { border-bottom:0; }
+.marketplace-item strong { min-width:0; overflow-wrap:anywhere; }
+.marketplace-item span { color:#587279; text-align:right; overflow-wrap:anywhere; }
+.marketplace-explore { margin-top:17px; }
+.marketplace-explore .panel-heading { margin-bottom:12px; }
+.marketplace-explore .panel-heading h3 { margin:0; }
+html.dark-theme .marketplace-card { background:#14262b; border-color:var(--line); }
+html.dark-theme .marketplace-card > strong,html.dark-theme .marketplace-item span,.dark-theme .marketplace-status-row { color:var(--muted); }
+@media(max-width:680px) {
+  .marketplace-grid { grid-template-columns:1fr; }
+  .marketplace-status-row { align-items:flex-start; flex-direction:column; }
+  .marketplace-status-row .button { width:100%; }
+}

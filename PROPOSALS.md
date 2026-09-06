@@ -16,7 +16,7 @@ Estas propuestas son compatibles con la arquitectura modular actual y no requier
 
 ### 8. Marketplace / propuestas WebDollar
 
-Tomando como referencia la separación de red, consenso y transacciones del repositorio público [WebDollar/webdollar2](https://github.com/WebDollar/webdollar2), el marketplace futuro debería ser un módulo de catálogo, no parte de `WalletCore`:
+**Adaptador implementado en v3.0** como `src/modules/marketplace.js`, siguiendo la separación de red, consenso y transacciones del repositorio público [WebDollar/webdollar2](https://github.com/WebDollar/webdollar2). El módulo es un conector real, no parte de `WalletCore`:
 
 1. Publicar una oferta como documento firmado por una dirección WebDollar: `offerId`, activo, cantidad, precio, expiración, garantías y dirección de liquidación.
 2. Resolver ofertas mediante un índice externo o P2P, mostrando siempre la red y el nodo que verificó cada dato.
@@ -24,7 +24,7 @@ Tomando como referencia la separación de red, consenso y transacciones del repo
 4. Usar escrow o un contrato de custodia compatible con el protocolo real; no fingir custodia con `localStorage` ni con un vale offline.
 5. Mantener reputación, cancelación, expiración y disputa fuera de las claves privadas. La PWA solo debe firmar un resumen mostrado al usuario.
 
-No se implementa el marketplace en esta entrega. El diseño evita mezclar cotizaciones, órdenes y saldos con el Core WebDollar.
+La entrega actual consulta el estado Mainnet y muestra WEBD como activo nativo. Solo habilita Assets/listados si el nodo anuncia el capability `webdollar-marketplace-v1`; en ese caso firma con confirmación humana y transmite a los endpoints del contrato. No finge custodia ni transmisión: el repositorio oficial aún declara Assets como trabajo en desarrollo, así que el Mainnet actual queda explícitamente bloqueado para listar/comprar hasta que exista un endpoint verificable.
 
 ### 9. Otras redes y activos
 

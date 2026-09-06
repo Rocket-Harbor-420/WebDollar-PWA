@@ -11,6 +11,7 @@ import { socketEventPacket,socketBinaryEventPacket } from '../src/core/native-so
 import { fixtureAccount,fixtureFile,fixtureSnapshot } from './fixtures.mjs';
 import { encryptWallet,decryptWallet } from '../src/core/wallet.js';
 import { offlineModule } from '../src/modules/offline.js';
+import { marketplaceModule } from '../src/modules/marketplace.js';
 
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 
@@ -185,6 +186,40 @@ test('offline v2 envelope rejects the same voucher and nonce twice',async()=>{
   offlineModule.init({getAddress:()=>FEE_ADDRESS,getSnapshot:()=>recipient.publicState().snapshot,receiveSigned:base64=>recipient.receiveSigned(base64),requestClaim:()=>({reviewRequired:true,txId:packet.voucher.txId})});
   const received=offlineModule.receiveViaNFC(packet.payload);assert.equal(received.recipientAmount,90);
   assert.throws(()=>offlineModule.receiveViaNFC(packet.payload),/nonce|registrado/i);
+});
+
+test('marketplace uses the public review hook and signs only after confirmation',async()=>{
+  const events=new EventBus(),net={subscribeBalance(address,handler){handler({...fixtureSnapshot(address),fetchedAt:Date.now()});return ()=>{};},async getSnapshot(address){return {...fixtureSnapshot(address),fetchedAt:Date.now()};}};
+  const wallet=new WalletCore(events,net);await wallet.importFile(fixtureFile());
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async(url,options={})=>{
+    const parsed=new URL(url),path=parsed.pathname;
+    if(path==='/')return {ok:true,json:async()=>({protocol:'WebDollar',blocks:{length:2000000}})};
+    if(path==='/marketplace/capabilities')return {ok:true,json:async()=>({protocol:'webdollar-marketplace-v1',network:'mainnet',assets:true,listings:true})};
+    if(path==='/address/assets')return {ok:true,json:async()=>({assets:[{id:'ASSET-001',symbol:'AST',name:'Asset Real',balance:'3',native:false},{id:'WEBD',symbol:'WEBD',name:'WebDollar',balance:'333',native:true}]})};
+    if(path==='/marketplace/listings'&&options.method==='POST')return {ok:true,json:async()=>({listing:{id:'listing-2',assetId:'ASSET-001',amount:'1',price:'25',seller:wallet.getAddress(),status:'active'}})};
+    if(path==='/marketplace/purchases'&&options.method==='POST')return {ok:true,json:async()=>({purchaseId:'purchase-1',status:'submitted'})};
+    if(path==='/marketplace/listings')return {ok:true,json:async()=>({listings:[{id:'listing-1',assetId:'ASSET-001',amount:'1',price:'25',seller:wallet.getAddress(),status:'active'}]})};
+    return {ok:false,status:404,json:async()=>({})};
+  };
+  try{
+    assert.throws(()=>wallet.signMarketplaceOrder({operation:'list',assetId:'ASSET-001',amount:'1',price:'25'}),/confirmación humana/);
+    const signed=wallet.signMarketplaceOrder({operation:'list',assetId:'ASSET-001',amount:'1',price:'25'},{confirmed:true});
+    assert.equal(signed.format,'webdollar-market-order-v1');assert.equal(signed.network,'mainnet');assert.equal(signed.owner,wallet.getAddress());
+    assert.match(signed.signature,/^[A-Za-z0-9+/]+=*$/);assert.equal(signed.orderId.length,64);
+    const payload={format:signed.format,network:signed.network,type:signed.type,operation:signed.operation,owner:signed.owner,assetId:signed.assetId,amount:signed.amount,price:signed.price,createdAt:signed.createdAt};
+    const publicKey=createPublicKey({format:'der',type:'spki',key:Buffer.concat([Buffer.from('302a300506032b6570032100','hex'),Buffer.from(signed.publicKey,'hex')])});
+    assert.equal(verify(null,Buffer.from(JSON.stringify(payload)),publicKey,Buffer.from(signed.signature,'base64')),true);
+    marketplaceModule.init({events,signMarketplaceOrder:data=>({reviewRequired:true,...data}),getAddress:()=>wallet.getAddress(),getBalance:()=>333,getNetworkSource:()=>null});
+    const connection=await marketplaceModule.connect('https://marketplace.example');assert.equal(connection.assetProtocolSupported,true);
+    const assets=await marketplaceModule.fetchAssets(wallet.getAddress());assert.equal(assets.assets.length,2);
+    const listings=await marketplaceModule.getListings();assert.equal(listings[0].id,'listing-1');
+    assert.deepEqual(marketplaceModule.listAssetForSale('ASSET-002','2','10.5'),{reviewRequired:true,operation:'list',assetId:'ASSET-002',amount:'2',price:'10.5'});
+    const listingResult=await marketplaceModule.submitListing(signed);assert.equal(listingResult.listing.id,'listing-2');
+    assert.deepEqual(marketplaceModule.buyAsset('listing-2'),{reviewRequired:true,operation:'buy',listingId:'listing-2',assetId:'ASSET-001',amount:'1',price:'25',seller:wallet.getAddress()});
+    const purchase=wallet.signMarketplaceOrder({operation:'buy',listingId:'listing-2',assetId:'ASSET-001',amount:'1',price:'25',seller:wallet.getAddress()},{confirmed:true});
+    assert.equal((await marketplaceModule.submitPurchase(purchase)).purchaseId,'purchase-1');
+  }finally{globalThis.fetch=originalFetch;}
 });
 
 test('native WebDollar Socket.IO packets are deterministic',()=>{

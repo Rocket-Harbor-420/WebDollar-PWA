@@ -7,6 +7,7 @@ import { accountFromMnemonic, newMnemonic } from './crypto.js';
 import { parseWebdWallet, decodeWebdAddress, privateKeyWif, bytesToHex, bytesToBase64, base64ToBytes } from './webd-format.js';
 import { calculateTransfer, withMinerFee, getPolicyIssues, buildAndSignMainnetTransaction, inspectSignedTransaction } from './transaction.js';
 import { signEd25519 } from './ed25519.js';
+import { sha256 } from '../vendor/dependencies.js';
 
 const ENCRYPTED_WALLET_FORMAT='webdollar-encrypted-v1';
 const PBKDF2_ITERATIONS=210000;
@@ -113,6 +114,20 @@ export class WalletCore {
   async exportEncryptedWallet(password){return encryptWallet(this.exportWallet(),password);}
   async encryptWallet(walletData,password){return encryptWallet(walletData,password);}
   async decryptWallet(encryptedData,password){return decryptWallet(encryptedData,password);}
+  signMarketplaceOrder(data,{confirmed=false}={}){
+    if(!confirmed)throw new Error('La orden Marketplace requiere confirmación humana.');
+    if(!this.isUnlocked)throw new Error('Carga una cartera desbloqueada para firmar una orden Marketplace.');
+    const operation=data?.operation==='buy'?'buy':'list';
+    const assetId=String(data?.assetId||'').trim(),price=String(data?.price??'').trim(),amount=String(data?.amount??'').trim();
+    if(!assetId||assetId.length>128||/[\u0000-\u001f]/.test(assetId))throw new Error('Asset ID inválido.');
+    if(operation==='buy'&&(!String(data?.listingId||'').trim()||!String(data?.seller||'').trim()))throw new Error('El listado de compra no contiene vendedor e identificador.');
+    if(!/^\d+(?:\.\d{1,4})?$/.test(amount)||Number(amount)<=0)throw new Error('La cantidad del activo debe ser mayor que cero.');
+    if(!/^\d+(?:\.\d{1,4})?$/.test(price)||Number(price)<=0)throw new Error('El precio debe ser un número WEBD mayor que cero.');
+    const payload={format:'webdollar-market-order-v1',network:'mainnet',type:operation==='buy'?'purchase':'listing',operation,owner:this.getAddress(),assetId,amount,price,createdAt:String(data.createdAt||new Date().toISOString())};
+    if(operation==='buy'){payload.listingId=String(data.listingId).trim();payload.seller=String(data.seller).trim();}
+    const message=new TextEncoder().encode(JSON.stringify(payload)),signature=signEd25519(this.#account.secretKey,message),orderId=bytesToHex(sha256(message));
+    return {...payload,orderId,publicKey:bytesToHex(this.#account.publicKey),signature:bytesToBase64(signature),status:'signed-local'};
+  }
   quote({to,amount}){
     decodeWebdAddress(to);
     const transfer=withMinerFee(calculateTransfer(amount));

@@ -21,6 +21,7 @@ export interface IModuleHooks {
   getAddress():string|null;getBalance():number|null;getSnapshot?():ChainSnapshot|null;events:IEventBus;
   getNetworkSource?():string|null;signPoSHeader?(header:Uint8Array):{signature:Uint8Array;publicKey:Uint8Array};
   checkTransaction?(txId:string):Promise<{status:string;txId?:string;height?:number}>;
+  signMarketplaceOrder(data:{operation:'list'|'buy';assetId:string;amount:string|number;price:string|number;listingId?:string;seller?:string}):{reviewRequired:true;operation:'list'|'buy';assetId:string;amount:string;price:string;listingId?:string;seller?:string};
   prepareOffline(data:SendInput):SignedTransaction;
   receiveSigned(base64:string):SignedTransaction;
   requestClaim(base64:string):{reviewRequired:true;txId:string};
@@ -29,6 +30,7 @@ export interface IPlugin {id:string;name:string;init(core:IModuleHooks):void|Pro
 export interface IWebDollarCore {
   getAddress():string|null;getBalance():number|null;getState():PublicWalletState;
   sendTransaction(data:SendInput):TransferQuote&{reviewRequired:true};
+  signMarketplaceOrder(data:{assetId:string;price:string|number}):{reviewRequired:true;assetId:string;price:string};
   events:IEventBus;registerModule(plugin:IPlugin):void;initializeModule(id:string):Promise<void>;
   getModules():Array<{id:string;name:string;status:string;error:string|null}>;
   attachMiningEngine(engine:IMiningEngine):void;attachMiningEngineUrl(url:string):void;
@@ -48,6 +50,8 @@ export interface IOfflineModule extends IPlugin {
 }
 export interface OfflineVoucherEnvelope {format:'webdollar-ecash-v2';version:2;voucherId:string;issuer:string;issuerNonce:number;createdAt:string;expiresAtHeight:number|null;transaction:string;}
 export interface IShareModule extends IPlugin {shareAddress(platform:'whatsapp'|'telegram'|'messenger',address?:string):string;shareVoucher(platform:'whatsapp'|'telegram'|'messenger',payload:string):string;}
+export interface MarketplaceOrder {format:'webdollar-market-order-v1';network:'mainnet';type:'listing'|'purchase';operation:'list'|'buy';owner:string;assetId:string;amount:string;price:string;createdAt:string;listingId?:string;seller?:string;orderId?:string;publicKey?:string;signature?:string;status?:string;}
+export interface IMarketplaceModule extends IPlugin {connect(endpoint?:string):Promise<{connected:boolean;endpoint:string|null;height?:number;assetProtocolSupported:boolean;message:string}>;connectToMarketplace(endpoint?:string):Promise<{connected:boolean;endpoint:string|null;height?:number;assetProtocolSupported:boolean;message:string}>;fetchAssets(address?:string):Promise<{address:string;assets:Array<{id:string;symbol:string;name:string;balance:string;native:boolean}>;tokenAssetsAvailable:boolean;assetProtocolSupported:boolean;message:string}>;listAssetForSale(assetId:string,amount:string|number,price:string|number):{reviewRequired:true;operation:'list';assetId:string;amount:string;price:string};buyAsset(listingId:string):{reviewRequired:true;operation:'buy';listingId:string;assetId:string;amount:string;price:string;seller:string};getListings():Promise<Array<{id:string;listingId:string;assetId:string;amount:string;price:string;seller:string;status:string}>>;submitListing(order:MarketplaceOrder):Promise<unknown>;submitPurchase(order:MarketplaceOrder):Promise<unknown>;}
 export interface CustomNode {id:string;label:string;endpoint:string;identity:{protocol:string;network:string;nodeId:string;version:string};readOnly:boolean;health:'unknown'|'healthy'|'unhealthy';}
 export interface ICustomNodesModule extends IPlugin {addNode(input:{endpoint:string;identity?:Partial<CustomNode['identity']>;label?:string}):CustomNode;listNodes():CustomNode[];healthCheck(node:string|CustomNode):Promise<CustomNode>;signingGuard(node:string|CustomNode):true;}
 export interface IAssetAdapter {id:string;network:string;assets():string[];quote(input:unknown):Promise<unknown>;buildUnsigned(input:unknown):Promise<unknown>;}

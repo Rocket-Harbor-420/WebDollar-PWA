@@ -24,3 +24,4 @@ WebDollar-wallet-debug.apk
 *.jks
 .env
 *.log
+*.tmp

@@ -15,6 +15,10 @@ window.webdollarCore.sendTransaction({
   to: 'una-direccion-WEBD-valida',
   amount: '100'
 }); // abre revisión humana; nunca transmite por sí solo
+
+const listing = window.webdollarCore.signMarketplaceOrder({
+  operation: 'list', assetId: 'ASSET-001', amount: '1', price: '25.00'
+}); // abre revisión humana; no transmite fondos
 ```
 
 Los tipos completos están en src/core/interfaces.d.ts. Los montos se reciben preferentemente como cadenas decimales. La comisión de tesorería está fijada en 10 WEBD por transacción; una cantidad que no cubra la comisión y la salida mínima del protocolo se rechaza.
@@ -35,6 +39,18 @@ La UI conserva su instancia de WalletCore en el ámbito del módulo JavaScript. 
 - checkTransaction(txId): distingue mempool, bloque y estado no verificado.
 
 La revisión de política se realiza tanto en WalletCore como en el adaptador. El firmador calcula la diferencia del minero como 580 unidades por byte para la transacción v2 de 167 bytes y la suma al débito de entrada; los dos outputs son el importe menos 10 WEBD al destinatario y 10 WEBD a la tesorería fija. Se bloquean importes bajo el mínimo oficial, saldos insuficientes, nonce obsoleto y nodos no sincronizados.
+
+## Marketplace
+
+`src/modules/marketplace.js` implementa `IMarketplaceModule` y se registra con `PluginManager`. Sus métodos son:
+
+- `connect(endpoint?)` (y alias `connectToMarketplace`): valida una fuente Mainnet y exige el capability document `webdollar-marketplace-v1` para habilitar operaciones de Assets.
+- `fetchAssets(address?)`: consulta el activo nativo WEBD desde los hooks públicos del Core y, si el capability está activo, consulta tokens reales en `/address/assets`; no lee almacenamiento de cartera.
+- `listAssetForSale(assetId, amount, price)`: valida los campos y llama a `window.webdollarCore.signMarketplaceOrder(data)`. Sin capability Mainnet lanza un error antes de abrir firma; con capability el resultado esperado es `{reviewRequired:true}` y la UI abre el diálogo.
+- `getListings()`: obtiene ofertas activas desde `/marketplace/listings`; no devuelve registros locales.
+- `buyAsset(listingId)`: toma un listado obtenido del nodo, pide revisión humana y firma una orden de compra; después `submitPurchase` transmite la orden a `/marketplace/purchases`.
+
+La confirmación final llama internamente a `WalletCore.signMarketplaceOrder(data, {confirmed:true})`. El Core comprueba que la cartera esté desbloqueada, valida Asset ID, cantidad, precio, vendedor y listado, y firma una orden canónica Ed25519. El módulo entrega los bytes de la orden firmada al endpoint Mainnet y solo marca la operación aceptada cuando el nodo devuelve una respuesta válida. No obtiene la semilla ni accede a `localStorage` privado. La propiedad `assetProtocolSupported` permanece en `false` mientras WebDollar2 no publique un estándar Mainnet estable; la UI bloquea la firma y la transmisión en ese estado.
 
 ## Formatos WebDollar
 

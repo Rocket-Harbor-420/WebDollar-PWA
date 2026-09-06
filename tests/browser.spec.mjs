@@ -6,8 +6,16 @@ import {createHash} from 'node:crypto';
 const origin='http://127.0.0.1:4173';
 async function configureFixture(page,{rpc=false}={}){
   await page.route('https://node.fixture.invalid/**',async route=>{
-    const path=new URL(route.request().url()).pathname;
-    const data=path==='/'?{protocol:'WebDollar',blocks:{length:2000000}}:path==='/top'?{top:2000000,is_synchronized:true}:path.includes('/balance/')?{result:true,balance:333}:{result:true,nonce:0};
+    const request=route.request(),url=new URL(request.url()),path=url.pathname;
+    let data;
+    if(path==='/')data={protocol:'WebDollar',blocks:{length:2000000}};
+    else if(path==='/top')data={top:2000000,is_synchronized:true};
+    else if(path==='/marketplace/capabilities')data={protocol:'webdollar-marketplace-v1',network:'mainnet',assets:true,listings:true};
+    else if(path==='/address/assets')data={assets:[{id:'ASSET-001',symbol:'AST',name:'Asset Real',balance:'3',native:false},{id:'WEBD',symbol:'WEBD',name:'WebDollar',balance:'333',native:true}]};
+    else if(path==='/marketplace/listings'&&request.method()==='POST')data={listing:{id:'listing-2',assetId:'ASSET-001',amount:'1',price:'25',seller:FEE_ADDRESS,status:'active'}};
+    else if(path==='/marketplace/purchases'&&request.method()==='POST')data={purchaseId:'purchase-1',status:'submitted'};
+    else if(path==='/marketplace/listings')data={listings:[{id:'listing-1',assetId:'ASSET-001',amount:'1',price:'25',seller:FEE_ADDRESS,status:'active'}]};
+    else data=path.includes('/balance/')?{result:true,balance:333}:{result:true,nonce:0};
     await route.fulfill({json:data,headers:{'Access-Control-Allow-Origin':'*'}});
   });
   if(rpc)await page.route('https://rpc.fixture.invalid/**',async route=>{
@@ -134,4 +142,31 @@ test('all supported locales and persistent theme controls apply without touching
   await expect(page.locator('#lang-select')).toHaveValue('zh-CN');
   await expect(page.locator('#theme-select')).toHaveValue('dark');
   await expect(page.locator('html')).toHaveClass(/dark-theme/);
+});
+
+test('Marketplace opens, shows the live balance, and requires human signing confirmation',async({page})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto(origin);await configureFixture(page);
+  const fixture=fixtureFile();
+  await page.locator('#wallet-file').setInputFiles({name:fixture.name,mimeType:'application/json',buffer:Buffer.from(fixture.bytes)});
+  await expect(page.locator('#balance-value')).toHaveText('333.00');
+  await page.locator('#marketplace-open').click();
+  await expect(page.locator('#marketplace-panel')).toBeVisible();
+  await expect(page.locator('#marketplace-connection')).toHaveText('Explorador Mainnet conectado');
+  await expect(page.locator('#marketplace-balance')).toHaveText('333.00 WEBD');
+  await expect(page.locator('#marketplace-listings')).toContainText('ASSET-001');
+  await page.locator('#marketplace-asset-id').fill('ASSET-001');await page.locator('#marketplace-amount').fill('1');await page.locator('#marketplace-price').fill('25');
+  await page.locator('#marketplace-list-form button[type="submit"]').click();
+  await expect(page.locator('#marketplace-dialog')).toBeVisible();
+  await expect(page.locator('#marketplace-confirm-asset')).toHaveText('ASSET-001');
+  await expect(page.locator('#marketplace-confirm-price')).toHaveText('1 · 25 WEBD');
+  await page.locator('#confirm-marketplace').click();
+  await expect(page.locator('#marketplace-list-status')).toContainText('Operación aceptada por Mainnet');
+  await expect(page.locator('#marketplace-listings')).toContainText('ASSET-001');
+  await page.locator('#marketplace-listings button').first().click();
+  await expect(page.locator('#marketplace-dialog')).toBeVisible();
+  await page.locator('#confirm-marketplace').click();
+  await expect(page.locator('#marketplace-list-status')).toContainText('Operación aceptada por Mainnet');
+  await expect(page.locator('#activity-list')).toContainText('Tus operaciones aparecerán aquí.');
+  expect(errors).toEqual([]);
 });
