@@ -38,8 +38,9 @@ async function requestJson(url,{method='GET',body}={}){
     if(body!==undefined){options.headers['Content-Type']='application/json';options.body=JSON.stringify(body);}
     const response=await fetch(url,options);
     if(!response.ok){const error=new Error(`HTTP ${response.status}`);error.status=response.status;throw error;}
-    const data=await response.json();
-    if(!data||typeof data!=='object')throw new Error('Respuesta Marketplace inválida.');
+    let data;
+    try{data=await response.json();}catch{const error=new Error('Respuesta Marketplace inválida.');error.protocolResponse=true;throw error;}
+    if(!data||typeof data!=='object'){const error=new Error('Respuesta Marketplace inválida.');error.protocolResponse=true;throw error;}
     return data;
   }finally{clearTimeout(timer);}
 }
@@ -61,7 +62,7 @@ function pendingId(){
   return globalThis.crypto?.randomUUID?.()||`pending-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
 }
 function isTransportFailure(error){
-  return error?.name==='AbortError'||error?.status===408||error?.status===429||Number(error?.status)>=500||!Number.isInteger(error?.status);
+  return !error?.protocolResponse&&(error?.name==='AbortError'||error?.status===408||error?.status===429||Number(error?.status)>=500||!Number.isInteger(error?.status));
 }
 function clone(value){return typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value));}
 function queueOperation(module,kind,signedOrder){
@@ -74,12 +75,12 @@ async function postOrder(module,kind,signedOrder){
   const path=kind==='listing'?'/marketplace/listings':'/marketplace/purchases';
   const response=await requestJson(module.apiBase+path,{method:'POST',body:{order:signedOrder}});
   if(kind==='listing'){
-    if(!response.listing||!response.listing.id)throw new Error('El nodo no confirmó la publicación del listado.');
+    if(!response.listing||!response.listing.id){const error=new Error('El nodo no confirmó la publicación del listado.');error.protocolResponse=true;throw error;}
     const listing=normalizeListing(response.listing);
     module.listings=[listing,...module.listings.filter(item=>item.id!==listing.id)];
     module.core?.events.emit('marketplace:listing',clone(response.listing));
   }else{
-    if(!response.purchaseId&&!response.txId&&!response.status)throw new Error('El nodo no confirmó la compra.');
+    if(!response.purchaseId&&!response.txId&&!response.status){const error=new Error('El nodo no confirmó la compra.');error.protocolResponse=true;throw error;}
     module.core?.events.emit('marketplace:purchase',clone(response));
   }
   return response;

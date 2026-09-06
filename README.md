@@ -126,7 +126,7 @@ npm run build:apk:local
 El resultado es `WebDollar-wallet-debug.apk`. En esta ejecución se generó y verificó:
 
 ```text
-SHA-256: 7975F2DCE31A8E34A6E72DAC8100AC1DAB1F37690B253471525CD22554EA0825
+SHA-256: 5BC79C002A16BD4135A550D492EDE5EA09826CABB71842DD3FC06EE38A68A358
 Package: com.webdollar.wallet
 Version: 3.0.0 (30)
 ```
@@ -134,7 +134,7 @@ Version: 3.0.0 (30)
 El build local también genera `build/release/WebDollar-wallet-debug.aab` con firma debug para pruebas internas:
 
 ```text
-SHA-256: 338F031DA3426234754821D889CC4C0795581447D40158DAD96346AB1AFAF5D5
+SHA-256: D17DAABEA33FA86E9FB686ED1CC931773B81D3617F31DDBA623DCBAE540D9778
 ```
 
 El APK/AAB local no incluye claves ni carteras. La PWA sigue exigiendo que el usuario seleccione el archivo `.webd` y confirme cualquier transmisión. La firma de depuración no debe utilizarse para publicar una versión de producción.
