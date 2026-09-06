@@ -246,6 +246,26 @@ test('marketplace reads WebDollar2 account assets from the native account and as
   }finally{globalThis.fetch=originalFetch;}
 });
 
+test('mainnet without a Marketplace capability never receives a false order broadcast',async()=>{
+  const events=new EventBus(),originalFetch=globalThis.fetch,calls=[];
+  marketplaceModule.init({events,getAddress:()=>fixtureAccount().address,getBalance:()=>333});
+  globalThis.fetch=async(url,options={})=>{
+    calls.push({url:String(url),method:options.method||'GET'});
+    const path=new URL(url).pathname;
+    if(path==='/')return {ok:true,json:async()=>({protocol:'WebDollar',version:'1.3.24',blocks:{length:5972771}})};
+    if(path==='/marketplace/capabilities')return {ok:false,status:404,json:async()=>({})};
+    return {ok:false,status:404,json:async()=>({})};
+  };
+  try{
+    const connection=await marketplaceModule.connect('https://pool.timi.ro');
+    assert.equal(connection.connected,true);assert.equal(connection.marketplaceProtocolSupported,false);
+    const result=await marketplaceModule.submitListing({format:'webdollar-market-order-v1',operation:'list',signature:'human-confirmed-signature',assetId:'ASSET-001',amount:'1',price:'25'});
+    assert.equal(result.status,'queued');assert.equal(result.queued,true);
+    assert.equal(calls.some(call=>call.method==='POST'),false);
+    assert.equal(calls.some(call=>call.url.endsWith('/marketplace/listings')),false);
+  }finally{globalThis.fetch=originalFetch;}
+});
+
 test('marketplace keeps a human-confirmed order pending when no node is available',async()=>{
   const events=new EventBus(),wallet=new WalletCore(events,{subscribeBalance(){return ()=>{};},async getSnapshot(){return fixtureSnapshot(fixtureAccount().address);}});
   await wallet.importFile(fixtureFile());
