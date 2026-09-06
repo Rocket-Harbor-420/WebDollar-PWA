@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: plugin-manager.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 export class PluginManager{
   #records=new Map();
   constructor(hooks,events){

@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: mining-pow-worker.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 importScripts('../vendor/argon2-bundled.min.js');
 
 let stopped=false;

@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: constants.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 export const APP_VERSION='2.0.0';
 export const NETWORK_NAME='WebDollar Mainnet';
 export { FEE_ADDRESS,FEE_RATE } from './transaction.js';

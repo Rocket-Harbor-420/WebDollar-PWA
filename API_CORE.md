@@ -120,3 +120,8 @@ No hay mint Cashu ni blind signatures. No hay garantía contra doble gasto antes
 ## Caché y build
 
 El Service Worker solo cachea recursos estáticos enumerados, nunca APIs. El bundle de dependencias está versionado en package-lock.json y se regenera con npm run build:assets. Los archivos fuente modulares se sirven directamente con Live Server.
+## Internacionalización y transporte NFC
+
+La UI carga `src/locales/es.json` y `src/locales/en.json` mediante `src/core/i18n.js`. Un módulo nuevo debe usar `t(key, params)` para mensajes dinámicos y atributos `data-i18n` para texto estático; no debe persistir secretos. La preferencia se guarda como `webdollar.language` y no contiene claves, saldos ni nonces.
+
+`offlineModule.writeViaNFC(amount, to)` y `offlineModule.readViaNFC()` encapsulan Web NFC mediante `NDEFReader`. Si el navegador no expone esa API, lanzan un error controlado para que la UI mantenga el flujo QR (`sendViaNFC` / `scanQrImage`). Un módulo no debe acceder a `WalletCore` ni al almacenamiento privado directamente.

@@ -32,11 +32,12 @@ test('import, exact review, fault isolation, local QR and responsive layouts',as
   const fixture=fixtureFile();
   await page.locator('#wallet-file').setInputFiles({name:fixture.name,mimeType:'application/json',buffer:Buffer.from(fixture.bytes)});
   await expect(page.locator('#balance-value')).toHaveText('333.00');
-  expect(await page.evaluate(()=>Object.keys(localStorage))).toEqual([]);
+  expect(await page.evaluate(()=>Object.keys(localStorage))).toEqual(['webdollar.language']);
   expect(await page.evaluate(()=>window.webdollarCore.wallet)).toBeUndefined();
   await page.locator('#recipient').fill(FEE_ADDRESS);await page.locator('#amount').fill('100');
   await page.getByRole('button',{name:'Revisar envío'}).click();
   await expect(page.locator('#confirm-receive-amount')).toHaveText('90.00 WEBD');
+  await expect(page.locator('#confirm-fee')).toHaveText('10.00 WEBD');
   await expect(page.locator('#confirm-debit')).toHaveText('109.686 WEBD');
   await expect(page.locator('#confirm-send')).toBeEnabled();
   await page.locator('[data-close="send-dialog"]').click();

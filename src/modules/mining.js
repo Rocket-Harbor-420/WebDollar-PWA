@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: mining.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 import { nacl, sha256 } from '../vendor/dependencies.js';
 import { NativeWebDollarSocket } from '../core/native-socket.js';
 import { decodeWebdAddress } from '../core/webd-format.js';

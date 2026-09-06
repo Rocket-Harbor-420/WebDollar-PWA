@@ -37,6 +37,8 @@ export interface IMiningModule extends IPlugin {startMining():Promise<void>;stop
 export interface IOfflineModule extends IPlugin {
   prepareEcash(amount:string|number,to:string):SignedTransaction;
   sendViaNFC(amount:string|number,to:string):{transport:'qr';voucher:SignedTransaction;payload:string};
+  writeViaNFC(amount:string|number,to:string):Promise<{transport:'nfc'|'qr';voucher:SignedTransaction;payload:string}>;
+  readViaNFC():Promise<string>;
   receiveViaNFC(payload:string):SignedTransaction;
   reclaim(payload:string):{reviewRequired:true;txId:string};
 }

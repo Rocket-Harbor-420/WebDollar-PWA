@@ -42,18 +42,20 @@ La aplicación aplica una comisión fija de 10 WEBD a tesorería por cada transf
 
 La política del cliente oficial exige 10 WEBD por cada salida. Con la comisión fija de 10 WEBD, el destinatario también debe recibir al menos 10 WEBD, así que el monto total mínimo compatible es 20 WEBD; además la PWA suma aproximadamente 9.686 WEBD de diferencia para el minero al débito. Por eso la prueba de 0.01 WEBD y el saldo declarado de 333 WEBD no permiten verificar un envío aceptado bajo esa política; una cuenta con saldo suficiente puede continuar después de la revisión humana.
 
-## Pago offline y Simular NFC
+## Pago offline, NFC real y fallback QR
 
 1. Antes de desconectarte, importa la cartera y obtén una consulta válida de saldo y nonce.
 2. Abre **Intercambiar vale**.
 3. Escribe la dirección de quien recibirá y el monto.
 4. Pulsa **Generar y firmar vale**. Esta acción crea una transacción firmada en memoria y su QR; no la transmite.
 5. Copia el vale o guarda/transfiere la imagen QR a la otra instancia.
-6. En la instancia receptora, carga su cartera o consulta su dirección. Abre el módulo y pega el vale, o utiliza **Simular NFC · Leer imagen QR**.
+6. En la instancia receptora, carga su cartera o consulta su dirección. Abre el módulo y pega el vale, utiliza **Leer NFC** en Android Chrome compatible, o usa **Leer imagen QR** como fallback.
 7. Pulsa **Validar recepción**. La app verifica la firma, el reparto y el destinatario, y rechaza el mismo vale si ya está registrado en esa sesión.
 8. Al reconectar utiliza **Revisar reclamo Mainnet**. El reclamo requiere confirmación y queda sujeto a la misma política de red.
 
 El saldo confirmado no cambia al intercambiar un vale. Los fondos no están bloqueados en cadena: el emisor podría gastar desde otro cliente y el vale puede quedar obsoleto por nonce o timelock. Esta versión no garantiza dinero Ecash anónimo ni evita el doble gasto antes de la liquidación. Copia los vales antes de cerrar la sesión.
+
+En Android Chrome compatible, **Enviar por NFC** solicita acercar el teléfono a una etiqueta NFC y escribe un registro NDEF de texto con el vale firmado. **Leer NFC** solicita permiso de lectura y valida el mismo prefijo de protocolo. Safari/iOS y navegadores sin Web NFC muestran el error controlado y permiten continuar con QR.
 
 ## Minería y fallos de módulos
 
@@ -65,20 +67,26 @@ Si el módulo falla, la cartera conserva la dirección y el saldo consultado. El
 
 Pulsa el icono de bloqueo. Se detiene la consulta periódica y se sobrescribe el array de clave privada de la sesión. La dirección y la última consulta siguen visibles. Importa de nuevo para firmar. Cerrar o recargar también elimina la sesión; esta versión no persiste vales ni historial.
 
-## Capturas de interfaz
+## Capturas simuladas de interfaz
+
+La siguiente representación textual sirve como captura reproducible sin incluir binarios de prueba en el repositorio:
+
+```text
+┌────────────────────────────────────────────┐
+│ WebDollar     Sin conexión   Instalar app  │
+│ Tu saldo, en tus manos.          🌐 ES     │
+│ [Importar .webd] [Crear cartera]           │
+│ Saldo en cadena       Minería              │
+│ 333.00 WEBD           [Iniciar minería]    │
+│ Enviar WEBD           Tu dirección  [QR]   │
+│ [Dirección] [Monto]  [Revisar envío]       │
+└────────────────────────────────────────────┘
+```
+
+La interfaz usa el mismo flujo en escritorio, tablet y móvil; el selector de idioma aparece en el pie de página y la sección offline ofrece QR y NFC.
 
 ## Instalar el APK local de desarrollo
 
 Desde la carpeta del proyecto ejecuta `npm run build:apk:local`. El resultado es `WebDollar-wallet-debug.apk`, firmado con la clave de depuración para pruebas. Puedes abrirlo en un emulador o instalarlo con `adb install -r WebDollar-wallet-debug.apk` si Android Platform Tools está disponible. Esta variante contiene los archivos de la PWA dentro de un WebView; no contiene la cartera física ni una semilla inicial.
 
-**Las siguientes son capturas reales de pruebas locales con un nodo de contrato controlado. El saldo 333 mostrado no es evidencia Mainnet ni corresponde a la cartera privada del usuario.**
-
-Escritorio, 1440 px:
-
-![Interfaz de prueba en escritorio](test-evidence/ui-1440.png)
-
-Móvil, viewport 375 × 812 con captura de página completa:
-
-![Interfaz de prueba en móvil](test-evidence/ui-375.png)
-
-Se verificó además ausencia de desplazamiento horizontal a 320 px. No se probó un dispositivo Android físico ni Safari/iOS.
+La prueba automatizada comprueba ausencia de desplazamiento horizontal en 1440, 375 y 320 px. La verificación de Web NFC depende de un dispositivo Android con NFC; Safari/iOS usa el fallback QR.

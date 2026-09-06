@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: webd-format.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 import { nacl, sha256, ripemd160 } from '../vendor/dependencies.js';
 
 export function concatWebdBytes(...arrays) {

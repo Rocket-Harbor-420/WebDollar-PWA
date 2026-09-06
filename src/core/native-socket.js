@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: native-socket.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 // Minimal Engine.IO v3 / Socket.IO v2 client for the WebDollar node protocol.
 // It intentionally implements only the browser-peer messages required by the
 // wallet: HelloNode, api/start, read-only API events and binary transaction

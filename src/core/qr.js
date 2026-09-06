@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: qr.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 import { qrcode, jsQR } from '../vendor/dependencies.js';
 export function qrDataUrl(payload){
   const qr=qrcode(0,'M');qr.addData(payload,'Byte');qr.make();

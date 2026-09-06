@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: ed25519.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 import { nacl } from '../vendor/dependencies.js';
 export function signEd25519(secretKey,message) {
   if(secretKey?.length!==64)throw new Error('Se requiere la clave Ed25519 de 64 bytes.');

@@ -2060,3 +2060,8 @@ zoo`.split(`
 @scure/bip39/esm/index.js:
   (*! scure-bip39 - MIT License (c) 2022 Patricio Palladino, Paul Miller (paulmillr.com) *)
 */
+/*
+ * WebDollar PWA - Módulo: dependencies.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */

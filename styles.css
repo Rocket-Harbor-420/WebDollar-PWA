@@ -73,3 +73,68 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.file-picker:focus-wi
   .qr-offline { width:min(280px,calc(100vw - 78px)); height:min(280px,calc(100vw - 78px)); }
   .toast-region { right:15px; bottom:15px; }
 }
+
+/* Safari/iOS safe-area and compact-width layout support. */
+html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+body { -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent; }
+button, input, textarea, select { -webkit-appearance:none; appearance:none; }
+button, .button, .file-picker, summary { -webkit-user-select:none; user-select:none; }
+.language-control { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.language-control select { border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); padding:6px 8px; font:inherit; }
+.nfc-actions { flex-wrap:wrap; }
+@supports(padding:max(0px)) {
+  .app-shell { padding-bottom:max(0px, env(safe-area-inset-bottom)); }
+  .topbar { padding-top:env(safe-area-inset-top); }
+}
+@media (max-width:1024px) {
+  .app-shell { max-width:100%; padding-left:clamp(16px,4vw,42px); padding-right:clamp(16px,4vw,42px); }
+  .main-layout { grid-template-columns:minmax(0,1fr); gap:28px; }
+  .side-rail { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  .side-rail > .text-button { align-self:center; }
+  .hero-heading { align-items:flex-start; }
+}
+@media (max-width:480px) {
+  .app-shell { padding-left:12px; padding-right:12px; }
+  .topbar { height:auto; min-height:72px; gap:8px; flex-wrap:wrap; padding-bottom:10px; }
+  .topbar-actions { margin-left:auto; gap:4px; }
+  .icon-button { transform:rotate(45deg) scale(.84); margin-right:2px; }
+  .brand small { font-size:7px; }
+  .brand-mark { width:32px; height:32px; font-size:20px; }
+  .hero-heading { display:block; margin-bottom:22px; }
+  .wallet-address-chip { margin-top:18px; max-width:100%; }
+  .setup-card { align-items:flex-start; flex-wrap:wrap; padding:18px; }
+  .setup-copy { min-width:0; flex:1 1 180px; }
+  .setup-actions { margin-left:0; flex-wrap:wrap; }
+  .wallet-secondary-actions { gap:8px 14px; }
+  .balance-grid { grid-template-columns:1fr; }
+  .balance-card { min-height:0; padding:20px; }
+  .content-grid { gap:14px; }
+  .receive-content { display:block; }
+  .receive-details { margin-top:18px; }
+  .side-rail { display:flex; flex-direction:column; }
+  .footer { flex-wrap:wrap; gap:12px; }
+  .footer .language-control { margin-left:0; }
+  .modal { width:calc(100% - 18px); max-width:calc(100% - 18px); padding:18px; }
+  .confirm-card { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:9px; }
+}
+@media (max-width:360px) {
+  h1 { font-size:clamp(34px,13vw,46px); }
+  .setup-card { padding:14px; }
+  .setup-actions .button { width:100%; }
+  .balance-value span { font-size:clamp(40px,16vw,56px); }
+  .button { padding:12px 11px; }
+  .wallet-secondary-actions { display:grid; grid-template-columns:1fr 1fr; }
+  .confirm-card { display:block; }
+  .confirm-card > * { display:block; margin-bottom:6px; }
+}
+@media (max-width:280px) {
+  .app-shell { padding-left:8px; padding-right:8px; }
+  .topbar { display:block; }
+  .topbar-actions { margin-top:10px; justify-content:space-between; }
+  .hero-copy, .small-note, .rail-note { font-size:11px; }
+  .panel, .rail-card, .balance-card { border-radius:10px; padding:14px; }
+  .panel-heading { gap:8px; }
+  .panel-heading h2 { font-size:20px; }
+  .amount-input input, input, textarea { min-width:0; }
+  .language-control select { max-width:96px; }
+}

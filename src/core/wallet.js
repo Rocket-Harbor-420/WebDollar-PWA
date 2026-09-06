@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: wallet.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 import { accountFromMnemonic, newMnemonic } from './crypto.js';
 import { parseWebdWallet, decodeWebdAddress, privateKeyWif, bytesToHex } from './webd-format.js';
 import { calculateTransfer, withMinerFee, getPolicyIssues, buildAndSignMainnetTransaction, inspectSignedTransaction } from './transaction.js';

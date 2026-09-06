@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: mining-worker.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 // Worker host for a compatible Mainnet engine supplied as an independent module.
 // It never receives wallet secret keys. It emits only actual engine measurements.
 let engine=null;

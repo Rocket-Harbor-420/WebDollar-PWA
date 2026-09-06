@@ -1,3 +1,8 @@
+/*
+ * WebDollar PWA - Módulo: event-bus.js
+ * Créditos a Jose Roberto De La Vega Arvizu - CEO en Harbor Hemp (Alias: Rocket-Harbor)
+ * Licencia MIT
+ */
 export class EventBus {
   #listeners = new Map();
   on(event, handler) { if (!this.#listeners.has(event)) this.#listeners.set(event, new Set()); this.#listeners.get(event).add(handler); return () => this.off(event, handler); }
