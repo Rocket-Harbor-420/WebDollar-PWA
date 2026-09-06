@@ -1,4 +1,4 @@
-const CACHE_NAME='webdollar-wallet-v20';
+const CACHE_NAME='webdollar-wallet-v21';
 const APP_SHELL=['./','./index.html','./styles.css','./manifest.json','./assets/icon-192.png','./assets/icon-512.png','./src/app.js','./src/core/constants.js','./src/core/crypto.js','./src/core/ed25519.js','./src/core/event-bus.js','./src/core/i18n.js','./src/core/native-socket.js','./src/core/network.js','./src/core/plugin-manager.js','./src/core/qr.js','./src/core/transaction.js','./src/core/wallet.js','./src/core/webd-format.js','./src/locales/es.json','./src/locales/en.json','./src/locales/it.json','./src/locales/ro.json','./src/locales/zh-CN.json','./src/vendor/dependencies.js','./src/vendor/argon2-bundled.min.js','./src/modules/mining.js','./src/modules/offline.js','./src/modules/messenger.js','./src/modules/custom-nodes.js','./src/modules/marketplace.js','./src/workers/mining-pow-worker.js'];
 const allowed=new Set(APP_SHELL.map(path=>new URL(path,self.registration.scope).href));
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting())));

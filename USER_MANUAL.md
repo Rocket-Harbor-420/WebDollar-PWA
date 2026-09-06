@@ -66,13 +66,13 @@ Si el módulo falla, la cartera conserva la dirección y el saldo consultado. El
 ## Mercado WebDollar: Assets y ofertas Mainnet
 
 1. Importa la cartera y consulta un nodo Mainnet. Pulsa **Mercado** para abrir la sección.
-2. La PWA consulta primero el nodo/explorador y solicita `GET /marketplace/capabilities`. Solo continúa si la respuesta anuncia `webdollar-marketplace-v1`, `network: mainnet`, Assets y listados.
-3. Cuando el protocolo está disponible, **Tus activos** consulta `/address/assets` y **Explorar listados** consulta `/marketplace/listings`. La aplicación no agrega ejemplos locales ni guarda ofertas en el navegador.
+2. La PWA consulta primero el nodo/explorador. Si reconoce la API nativa de WebDollar2, **Tus activos** consulta `/account?address=...` y `/asset?hash=...` para leer los saldos reales y sus metadatos. Para habilitar listados y compras también solicita `GET /marketplace/capabilities`.
+3. **Explorar listados** solo consulta `/marketplace/listings` cuando la respuesta anuncia `webdollar-marketplace-v1`, `network: mainnet`, Assets y listados. La aplicación no agrega ejemplos locales ni guarda ofertas en el navegador.
 4. Para vender, introduce Asset ID, cantidad y precio. Pulsa **Listar activo** y revisa el diálogo. El clic explícito **Confirmar, firmar y transmitir** es el único paso que permite firmar; después la orden se envía a `/marketplace/listings` y la UI espera el acuse del nodo.
 5. Para comprar, pulsa **Comprar** junto a un listado obtenido del nodo. Revisa el identificador, cantidad, vendedor y precio; confirma para firmar y transmitir a `/marketplace/purchases`.
 6. Si el nodo se desconecta después de tu confirmación, la aplicación muestra **Pendientes de red** y conserva la orden firmada únicamente en la sesión. Cuando el nodo Marketplace vuelva a anunciar el protocolo, pulsa **Reintentar pendientes**; una orden desaparece de la cola solo después del acuse válido del nodo.
 
-El repositorio oficial WebDollar2 aún describe su código como “Under development. Not working right now” y no publica un endpoint Mainnet estable de Assets/Marketplace. Por eso, con los nodos WebDollar Mainnet actuales, la sección muestra el saldo WEBD real y el estado **El nodo no anuncia el protocolo Marketplace Mainnet**; **Listar activo** y **Comprar** se bloquean antes de firmar. Esta respuesta es intencional: evita crear una firma o un listado local que no pueda liquidarse en la blockchain.
+El repositorio oficial WebDollar2 aún describe su código como “Under development. Not working right now”. Su API de Assets no es un libro de órdenes: aun cuando se puedan leer tokens reales, **Listar activo** y **Comprar** se bloquean antes de firmar mientras el nodo no anuncie el capability Marketplace verificable. Esta respuesta evita crear una firma o un listado local que no pueda liquidarse en la blockchain.
 
 ## Bloquear
 

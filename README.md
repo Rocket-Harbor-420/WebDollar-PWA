@@ -31,7 +31,7 @@ Visita http://127.0.0.1:4173. El paquete contiene las dependencias del navegador
 | Copia cifrada | AES-256-GCM + PBKDF2-SHA-256 para exportación `.encrypted.webd`, con roundtrip probado |
 | Métricas de minería | Aceptados, rechazados, latencia, uptime, trabajos e intentos en memoria de sesión |
 | Mensajería | Deep links para compartir dirección y vale por WhatsApp, Telegram y Messenger |
-| Marketplace | Adaptador Mainnet real: consulta Assets/listados y firma/transmite solo cuando el nodo anuncia `webdollar-marketplace-v1` |
+| Marketplace | Adaptador Mainnet real: consulta Assets nativos WebDollar2 o `/address/assets`; firma/transmite listados solo cuando el nodo anuncia `webdollar-marketplace-v1` |
 | Doble gasto offline | Sobre v2 con nonce, +100 bloques de caducidad, deduplicación en sesión y verificación on-chain oportunista |
 | PWA | Service Worker e iconos PNG; instalabilidad comprobada en Chrome |
 | APK | APK debug local compilado y verificado; TWA release requiere dominio HTTPS y firma |
@@ -84,9 +84,9 @@ src/modules/mining.js proporciona startMining, stopMining, getHashRate y attachW
 
 ## Marketplace WebDollar (v3.0)
 
-`src/modules/marketplace.js` está registrado como plugin independiente. Consulta una fuente Mainnet y expone el activo nativo WEBD. Para tokens y listados exige que el endpoint responda a `GET /marketplace/capabilities` con `protocol: "webdollar-marketplace-v1"`, `network: "mainnet"`, `assets: true` y `listings: true`. En ese caso consulta `/address/assets`, `/marketplace/listings`, y transmite órdenes firmadas mediante `POST /marketplace/listings` y `POST /marketplace/purchases`. El formulario nunca recibe ni lee la clave privada: llama a `window.webdollarCore.signMarketplaceOrder(data)`, abre una revisión humana y el Core firma únicamente después del clic real de confirmación. Si el transporte se cae después de esa confirmación, la orden firmada se conserva en una cola volátil de red y se reintenta con el botón de pendientes; solo un acuse válido del endpoint la marca como transmitida. No se crean listados locales ni datos de mercado ficticios.
+`src/modules/marketplace.js` está registrado como plugin independiente. Consulta una fuente Mainnet y separa dos capacidades: `assetProtocolSupported` para leer Assets reales y `marketplaceProtocolSupported` para operar listados. Cuando detecta la API nativa de WebDollar2, consulta `/account?address=...`, obtiene cada identificador desde `accountsExtra[].asset` y consulta `/asset?hash=...` para mostrar WEBD y tokens con sus decimales. Para listar/comprar exige además que el endpoint responda a `GET /marketplace/capabilities` con `protocol: "webdollar-marketplace-v1"`, `network: "mainnet"`, `assets: true` y `listings: true`; solo entonces consulta `/marketplace/listings` y transmite órdenes mediante `POST /marketplace/listings` y `POST /marketplace/purchases`. El formulario nunca recibe ni lee la clave privada: llama a `window.webdollarCore.signMarketplaceOrder(data)`, abre una revisión humana y el Core firma únicamente después del clic real de confirmación. Si el transporte se cae después de esa confirmación, la orden firmada se conserva en una cola volátil de red y se reintenta con el botón de pendientes; solo un acuse válido del endpoint la marca como transmitida. No se crean listados locales ni datos de mercado ficticios.
 
-El repositorio oficial [WebDollar/webdollar2](https://github.com/WebDollar/webdollar2) declara que está “Under development. Not working right now” y sus documentos de Assets describen comandos de investigación, no un endpoint Mainnet estable. Por eso esta versión no inventa un contrato ni presenta un activo ficticio como liquidado: en el Mainnet actual el módulo muestra WEBD, marca el protocolo como no anunciado y bloquea listar/comprar sin firmar. Cuando un nodo publique el contrato verificable, el adaptador podrá transmitirlo sin tocar `WalletCore`. La interfaz y los tipos del módulo están documentados en `API_CORE.md` e `src/core/interfaces.d.ts`.
+El repositorio oficial [WebDollar/webdollar2](https://github.com/WebDollar/webdollar2) declara que está “Under development. Not working right now”. Sus documentos de [Assets](https://github.com/WebDollar/webdollar2/blob/main/docs/assets.md) y [API](https://github.com/WebDollar/webdollar2/blob/main/docs/api.md) sí describen lectura de cuentas/activos y mempool, pero no un libro de órdenes ni endpoints de listar/comprar. Por eso esta versión integra la lectura nativa cuando un nodo WebDollar2 la expone, pero no inventa un contrato Marketplace ni presenta una orden como liquidada: en los nodos Mainnet actuales el módulo muestra WEBD, puede mostrar Assets solo si la API real responde y bloquea listar/comprar hasta que exista un capability verificable. La interfaz y los tipos del módulo están documentados en `API_CORE.md` y `src/core/interfaces.d.ts`.
 
 ## Pruebas
 
@@ -126,7 +126,7 @@ npm run build:apk:local
 El resultado es `WebDollar-wallet-debug.apk`. En esta ejecución se generó y verificó:
 
 ```text
-SHA-256: 5BC79C002A16BD4135A550D492EDE5EA09826CABB71842DD3FC06EE38A68A358
+SHA-256: BDFAC05A4630F7C24ACD8C62C4EB51B72386DD3009F7032DECFD853B3D0D3BF5
 Package: com.webdollar.wallet
 Version: 3.0.0 (30)
 ```
@@ -134,7 +134,7 @@ Version: 3.0.0 (30)
 El build local también genera `build/release/WebDollar-wallet-debug.aab` con firma debug para pruebas internas:
 
 ```text
-SHA-256: D17DAABEA33FA86E9FB686ED1CC931773B81D3617F31DDBA623DCBAE540D9778
+SHA-256: 6F19800BAC43DF80A824487E99AED4ABB8CE70C7DC13E4169505CCA9C3FB597C
 ```
 
 El APK/AAB local no incluye claves ni carteras. La PWA sigue exigiendo que el usuario seleccione el archivo `.webd` y confirme cualquier transmisión. La firma de depuración no debe utilizarse para publicar una versión de producción.

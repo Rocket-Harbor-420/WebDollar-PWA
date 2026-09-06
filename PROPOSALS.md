@@ -24,7 +24,7 @@ Estas propuestas son compatibles con la arquitectura modular actual y no requier
 4. Usar escrow o un contrato de custodia compatible con el protocolo real; no fingir custodia con `localStorage` ni con un vale offline.
 5. Mantener reputación, cancelación, expiración y disputa fuera de las claves privadas. La PWA solo debe firmar un resumen mostrado al usuario.
 
-La entrega actual consulta el estado Mainnet y muestra WEBD como activo nativo. Solo habilita Assets/listados si el nodo anuncia el capability `webdollar-marketplace-v1`; en ese caso firma con confirmación humana y transmite a los endpoints del contrato. No finge custodia ni transmisión: el repositorio oficial aún declara Assets como trabajo en desarrollo, así que el Mainnet actual queda explícitamente bloqueado para listar/comprar hasta que exista un endpoint verificable.
+La entrega actual consulta el estado Mainnet. Puede leer Assets nativos de WebDollar2 mediante `/account` y `/asset` cuando esa API se anuncia, pero solo habilita listados/compras si el nodo anuncia el capability `webdollar-marketplace-v1`; en ese caso firma con confirmación humana y transmite a los endpoints del contrato. No finge custodia ni transmisión: el repositorio oficial aún declara WebDollar2 como trabajo en desarrollo y no documenta un libro de órdenes, así que el Mainnet actual queda explícitamente bloqueado para listar/comprar hasta que exista un endpoint verificable.
 
 ### 9. Otras redes y activos
 

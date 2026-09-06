@@ -26,12 +26,19 @@ const MARKETPLACE_QUEUE_MESSAGES={
   ro:{'marketplace.queued':'Ordin semnat salvat pentru o nouă încercare de rețea: {reference}','marketplace.pendingCount':'În așteptarea rețelei: {count}','marketplace.retryPending':'Reîncearcă ordinele în așteptare','marketplace.retryResult':'Transmise: {count}'},
   'zh-CN':{'marketplace.queued':'已保存签名订单，等待网络重试：{reference}','marketplace.pendingCount':'等待网络：{count}','marketplace.retryPending':'重试待处理订单','marketplace.retryResult':'已发送：{count}'}
 };
+const MARKETPLACE_ASSET_MESSAGES={
+  es:{'marketplace.assetsConnected':'API de Assets conectada; Marketplace no anunciado'},
+  en:{'marketplace.assetsConnected':'Assets API connected; Marketplace not announced'},
+  it:{'marketplace.assetsConnected':'API Assets connessa; Marketplace non annunciato'},
+  ro:{'marketplace.assetsConnected':'API Assets conectat; Marketplace neanunțat'},
+  'zh-CN':{'marketplace.assetsConnected':'Assets API 已连接；节点未公布市场协议'}
+};
 
 function interpolate(value,params={}){
   return String(value).replace(/\{(\w+)\}/g,(_,key)=>params[key]===undefined?`{${key}}`:String(params[key]));
 }
 export function getLanguage(){return language;}
-export function t(key,params={}){return interpolate(messages[key]??MARKETPLACE_MESSAGES[language]?.[key]??MARKETPLACE_QUEUE_MESSAGES[language]?.[key]??key,params);}
+export function t(key,params={}){return interpolate(messages[key]??MARKETPLACE_MESSAGES[language]?.[key]??MARKETPLACE_QUEUE_MESSAGES[language]?.[key]??MARKETPLACE_ASSET_MESSAGES[language]?.[key]??key,params);}
 export function getTheme(){return theme;}
 export function effectiveTheme(){return theme==='system'&&themeMediaQuery?themeMediaQuery.matches?'dark':'light':theme;}
 export function applyTheme(){

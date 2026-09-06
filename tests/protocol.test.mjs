@@ -222,6 +222,28 @@ test('marketplace uses the public review hook and signs only after confirmation'
   }finally{globalThis.fetch=originalFetch;}
 });
 
+test('marketplace reads WebDollar2 account assets from the native account and asset APIs',async()=>{
+  const events=new EventBus(),account=fixtureAccount(),originalFetch=globalThis.fetch,assetHash=Buffer.alloc(32,1).toString('base64');
+  marketplaceModule.init({events,getAddress:()=>account.address,getBalance:()=>333});
+  globalThis.fetch=async(url)=>{
+    const path=new URL(url).pathname;
+    if(path==='/')return {ok:true,json:async()=>({name:'WebDollar2',version:'0.1.0',network:0})};
+    if(path==='/chain')return {ok:true,json:async()=>({height:12,hash:'chain-hash'})};
+    if(path==='/marketplace/capabilities')return {ok:false,status:404,json:async()=>({})};
+    if(path==='/account')return {ok:true,json:async()=>({accounts:[{balance:12345}],accountsExtra:[{asset:assetHash}]})};
+    if(path==='/asset')return {ok:true,json:async()=>({asset:{identification:'AST-010203',ticker:'AST',name:'Asset Real',decimalSeparator:2}})};
+    return {ok:false,status:404,json:async()=>({})};
+  };
+  try{
+    const connection=await marketplaceModule.connect('https://webdollar2.example');
+    assert.equal(connection.connected,true);assert.equal(connection.assetProtocolSupported,true);assert.equal(connection.marketplaceProtocolSupported,false);assert.equal(connection.assetApiFlavor,'webdollar2-assets');
+    const assets=await marketplaceModule.fetchAssets(account.address);
+    assert.deepEqual(assets.assets,[{id:'AST-010203',symbol:'AST',name:'Asset Real',balance:'123.45',native:false,decimals:2}]);
+    assert.deepEqual(await marketplaceModule.getListings(),[]);
+    assert.throws(()=>marketplaceModule.listAssetForSale('AST-010203','1','25'),/protocolo Marketplace/i);
+  }finally{globalThis.fetch=originalFetch;}
+});
+
 test('marketplace keeps a human-confirmed order pending when no node is available',async()=>{
   const events=new EventBus(),wallet=new WalletCore(events,{subscribeBalance(){return ()=>{};},async getSnapshot(){return fixtureSnapshot(fixtureAccount().address);}});
   await wallet.importFile(fixtureFile());

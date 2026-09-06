@@ -13,6 +13,7 @@ const ORDER_FORMAT='webdollar-market-order-v1';
 const MARKETPLACE_PROTOCOL='webdollar-marketplace-v1';
 const MAX_REQUEST_MS=6000;
 const MARKETPLACE_UNAVAILABLE='El endpoint Mainnet no anuncia un protocolo Marketplace de WebDollar.';
+const WEBDOLLAR2_ASSET_API='webdollar2-assets';
 
 function normalizeText(value,label,max=128){
   const text=String(value??'').trim();
@@ -49,9 +50,21 @@ function readHeight(identity){
   if(!Number.isSafeInteger(height)||height<1)throw new Error('La respuesta no contiene una altura Mainnet válida.');
   return height;
 }
+function looksLikeWebDollar2(value){
+  const text=JSON.stringify(value??{}).toLowerCase();
+  return /pandorapay|webdollar2/.test(text)||Object.hasOwn(value??{},'totalDifficulty')&&Object.hasOwn(value??{},'assets');
+}
+function formatUnits(value,decimals){
+  const amount=BigInt(String(value??0));
+  const places=Math.max(0,Number(decimals)||0);
+  if(!places)return amount.toString();
+  const raw=amount.toString().padStart(places+1,'0');
+  const whole=raw.slice(0,-places),fraction=raw.slice(-places).replace(/0+$/,'');
+  return fraction?`${whole}.${fraction}`:whole;
+}
 function normalizeAsset(asset){
   if(!asset||typeof asset!=='object')throw new Error('El nodo devolvió un activo inválido.');
-  return {id:normalizeText(asset.id??asset.assetId??asset.ticker,'Asset ID'),symbol:normalizeText(asset.symbol??asset.ticker??asset.id,'Símbolo',32),name:normalizeText(asset.name??asset.symbol??asset.id,'Nombre',128),balance:String(asset.balance??asset.amount??'0'),native:asset.native===true};
+  return {id:normalizeText(asset.id??asset.assetId??asset.ticker,'Asset ID'),symbol:normalizeText(asset.symbol??asset.ticker??asset.id,'Símbolo',32),name:normalizeText(asset.name??asset.symbol??asset.id,'Nombre',128),balance:String(asset.balance??asset.amount??'0'),native:asset.native===true,decimals:Number(asset.decimals)||0};
 }
 function normalizeListing(listing){
   if(!listing||typeof listing!=='object')throw new Error('El nodo devolvió un listado inválido.');
@@ -85,25 +98,45 @@ async function postOrder(module,kind,signedOrder){
   }
   return response;
 }
+async function fetchWebDollar2Assets(module,address){
+  const response=await requestJson(module.apiBase+'/account?address='+encodeURIComponent(address));
+  const accounts=Array.isArray(response.accounts)?response.accounts:[];
+  const extras=Array.isArray(response.accountsExtra)?response.accountsExtra:[];
+  const assets=[];
+  for(let index=0;index<accounts.length;index++){
+    const account=accounts[index],assetHash=extras[index]?.asset??account.asset;
+    if(typeof assetHash!=='string'||!assetHash)continue;
+    const metadataResponse=await requestJson(module.apiBase+'/asset?hash='+encodeURIComponent(assetHash));
+    const metadata=metadataResponse.asset;
+    if(!metadata||typeof metadata!=='object')throw new Error('El nodo WebDollar2 no devolvió metadatos del activo.');
+    assets.push(normalizeAsset({id:metadata.identification||assetHash,symbol:metadata.ticker||metadata.identification||assetHash,name:metadata.name||metadata.ticker||assetHash,balance:formatUnits(account.balance,metadata.decimalSeparator),decimals:metadata.decimalSeparator,native:metadata.ticker==='WEBD'||metadata.identification==='WEBD'}));
+  }
+  return assets;
+}
 export const marketplaceModule={
-  id:'marketplace',name:'Mercado WebDollar',core:null,connected:false,endpoint:null,apiBase:null,assetProtocolSupported:false,assets:[],listings:[],pendingOperations:[],lastError:null,lastMessage:'',
-  init(core){this.core=core;this.connected=false;this.endpoint=null;this.apiBase=null;this.assetProtocolSupported=false;this.assets=[];this.listings=[];this.pendingOperations=[];this.lastError=null;this.lastMessage='';},
+  id:'marketplace',name:'Mercado WebDollar',core:null,connected:false,endpoint:null,apiBase:null,assetProtocolSupported:false,marketplaceProtocolSupported:false,assetApiFlavor:null,assets:[],listings:[],pendingOperations:[],lastError:null,lastMessage:'',
+  init(core){this.core=core;this.connected=false;this.endpoint=null;this.apiBase=null;this.assetProtocolSupported=false;this.marketplaceProtocolSupported=false;this.assetApiFlavor=null;this.assets=[];this.listings=[];this.pendingOperations=[];this.lastError=null;this.lastMessage='';},
   async connect(endpoint=this.core?.getNetworkSource?.()||DEFAULT_EXPLORER){
     this.endpoint=normalizeEndpoint(endpoint);this.apiBase=this.endpoint;this.lastError=null;this.lastMessage='';
     try{
       const identity=await requestJson(this.endpoint.endsWith('/api')?this.endpoint+'/chain':this.endpoint+'/');
-      const height=readHeight(identity);this.connected=true;this.assetProtocolSupported=false;
+      let chain=identity,height;
+      try{height=readHeight(chain);}catch{chain=await requestJson(this.apiBase+'/chain');height=readHeight(chain);}
+      const isWebDollar2=looksLikeWebDollar2(identity)||looksLikeWebDollar2(chain);
+      this.connected=true;this.assetProtocolSupported=false;this.marketplaceProtocolSupported=false;this.assetApiFlavor=null;
       try{
         const capability=await requestJson(this.apiBase+'/marketplace/capabilities');
-        this.assetProtocolSupported=capability.protocol===MARKETPLACE_PROTOCOL&&capability.network==='mainnet'&&capability.assets===true&&capability.listings===true;
+        const supported=capability.protocol===MARKETPLACE_PROTOCOL&&capability.network==='mainnet'&&capability.assets===true&&capability.listings===true;
+        this.assetProtocolSupported=supported;this.marketplaceProtocolSupported=supported;this.assetApiFlavor=supported?'marketplace':null;
       }catch(error){
         if(error.status!==404&&error.status!==405)this.lastError=error.message;
       }
-      this.lastMessage=this.assetProtocolSupported?'Protocolo Marketplace Mainnet disponible.':MARKETPLACE_UNAVAILABLE;
-      return {connected:true,endpoint:this.endpoint,height,assetProtocolSupported:this.assetProtocolSupported,message:this.lastMessage};
+      if(!this.assetProtocolSupported&&isWebDollar2){this.assetProtocolSupported=true;this.assetApiFlavor=WEBDOLLAR2_ASSET_API;}
+      this.lastMessage=this.marketplaceProtocolSupported?'Protocolo Marketplace Mainnet disponible.':this.assetApiFlavor===WEBDOLLAR2_ASSET_API?'API de Assets WebDollar2 disponible; Marketplace no anunciado.':MARKETPLACE_UNAVAILABLE;
+      return {connected:true,endpoint:this.endpoint,height,assetProtocolSupported:this.assetProtocolSupported,marketplaceProtocolSupported:this.marketplaceProtocolSupported,assetApiFlavor:this.assetApiFlavor,message:this.lastMessage};
     }catch(error){
-      this.connected=false;this.assetProtocolSupported=false;this.lastError=error?.message||String(error);this.lastMessage=this.lastError;
-      return {connected:false,endpoint:this.endpoint,assetProtocolSupported:false,message:this.lastMessage};
+      this.connected=false;this.assetProtocolSupported=false;this.marketplaceProtocolSupported=false;this.assetApiFlavor=null;this.lastError=error?.message||String(error);this.lastMessage=this.lastError;
+      return {connected:false,endpoint:this.endpoint,assetProtocolSupported:false,marketplaceProtocolSupported:false,message:this.lastMessage};
     }
   },
   async connectToMarketplace(endpoint){return this.connect(endpoint);},
@@ -113,26 +146,26 @@ export const marketplaceModule={
     if(!this.connected)throw new Error(this.lastMessage||'No hay conexión Mainnet.');
     if(!this.assetProtocolSupported){
       const balance=this.core?.getBalance?.();
-      this.assets=[{id:'WEBD',symbol:'WEBD',name:'WebDollar',balance:balance===null||balance===undefined?'—':Number(balance).toFixed(4),native:true}];
+      this.assets=[{id:'WEBD',symbol:'WEBD',name:'WebDollar',balance:balance===null||balance===undefined?'—':Number(balance).toFixed(4),native:true,decimals:4}];
       this.lastMessage=MARKETPLACE_UNAVAILABLE;
       return {address,assets:this.assets.slice(),tokenAssetsAvailable:false,assetProtocolSupported:false,message:this.lastMessage};
     }
-    const response=await requestJson(this.apiBase+'/address/assets?address='+encodeURIComponent(address));
-    const assets=Array.isArray(response.assets)?response.assets.map(normalizeAsset):[];
+    const assets=this.assetApiFlavor===WEBDOLLAR2_ASSET_API?await fetchWebDollar2Assets(this,address):await (async()=>{const response=await requestJson(this.apiBase+'/address/assets?address='+encodeURIComponent(address));return Array.isArray(response.assets)?response.assets.map(normalizeAsset):[];})();
     this.assets=assets;this.lastMessage='Activos consultados desde el endpoint Marketplace Mainnet.';
+    if(this.assetApiFlavor===WEBDOLLAR2_ASSET_API)this.lastMessage='Activos consultados desde la API nativa de WebDollar2.';
     return {address,assets:this.assets.slice(),tokenAssetsAvailable:true,assetProtocolSupported:true,message:this.lastMessage};
   },
   async getListings(){
     if(!this.connected)await this.connect();
     if(!this.connected)throw new Error(this.lastMessage||'No hay conexión Mainnet.');
-    if(!this.assetProtocolSupported){this.listings=[];return [];}
+    if(!this.marketplaceProtocolSupported){this.listings=[];return [];}
     const response=await requestJson(this.apiBase+'/marketplace/listings');
     if(!Array.isArray(response.listings))throw new Error('El nodo no devolvió una lista de ofertas válida.');
     this.listings=response.listings.map(normalizeListing);return this.listings.slice();
   },
   listAssetForSale(assetId,amount,price){
     const data={operation:'list',assetId:normalizeText(assetId,'Asset ID'),amount:normalizeAmount(amount),price:normalizePrice(price)};
-    if(this.connected&&!this.assetProtocolSupported)throw protocolError();
+    if(this.connected&&!this.marketplaceProtocolSupported)throw protocolError();
     const signer=globalThis.window?.webdollarCore?.signMarketplaceOrder||this.core?.signMarketplaceOrder;
     if(!signer)throw new Error('El Core no expone el hook de firma del Marketplace.');
     return signer(data);
@@ -140,7 +173,7 @@ export const marketplaceModule={
   buyAsset(listingId){
     const listing=this.listings.find(item=>item.id===String(listingId));
     if(!listing)throw new Error('El listado ya no está disponible; actualiza el mercado.');
-    if(this.connected&&!this.assetProtocolSupported)throw protocolError();
+    if(this.connected&&!this.marketplaceProtocolSupported)throw protocolError();
     const signer=globalThis.window?.webdollarCore?.signMarketplaceOrder||this.core?.signMarketplaceOrder;
     if(!signer)throw new Error('El Core no expone el hook de firma del Marketplace.');
     return signer({operation:'buy',listingId:listing.id,assetId:listing.assetId,amount:listing.amount,price:listing.price,seller:listing.seller});
@@ -149,17 +182,17 @@ export const marketplaceModule={
   async submitListing(signedOrder){
     if(!signedOrder?.signature||signedOrder.operation!=='list'||signedOrder.format!==ORDER_FORMAT)throw new Error('Orden de venta firmada inválida.');
     if(!this.connected)return queueOperation(this,'listing',signedOrder);
-    if(!this.assetProtocolSupported)throw protocolError();
+    if(!this.marketplaceProtocolSupported)throw protocolError();
     try{return await postOrder(this,'listing',signedOrder);}catch(error){if(!isTransportFailure(error))throw error;return queueOperation(this,'listing',signedOrder);}
   },
   async submitPurchase(signedOrder){
     if(!signedOrder?.signature||signedOrder.operation!=='buy'||signedOrder.format!==ORDER_FORMAT)throw new Error('Orden de compra firmada inválida.');
     if(!this.connected)return queueOperation(this,'purchase',signedOrder);
-    if(!this.assetProtocolSupported)throw protocolError();
+    if(!this.marketplaceProtocolSupported)throw protocolError();
     try{return await postOrder(this,'purchase',signedOrder);}catch(error){if(!isTransportFailure(error))throw error;return queueOperation(this,'purchase',signedOrder);}
   },
   async retryPending(){
-    if(!this.connected||!this.assetProtocolSupported)return {attempted:0,transmitted:0,pending:this.getPendingOperations()};
+    if(!this.connected||!this.marketplaceProtocolSupported)return {attempted:0,transmitted:0,pending:this.getPendingOperations()};
     const pending=[...this.pendingOperations],transmitted=[];
     for(const operation of pending){
       try{
@@ -173,5 +206,5 @@ export const marketplaceModule={
     }
     return {attempted:pending.length,transmitted:transmitted.length,pending:this.getPendingOperations(),transmittedItems:transmitted};
   },
-  getState(){return {connected:this.connected,endpoint:this.endpoint,assetProtocolSupported:this.assetProtocolSupported,assets:this.assets.slice(),listings:this.listings.slice(),pendingOperations:this.getPendingOperations(),lastError:this.lastError,lastMessage:this.lastMessage};}
+  getState(){return {connected:this.connected,endpoint:this.endpoint,assetProtocolSupported:this.assetProtocolSupported,marketplaceProtocolSupported:this.marketplaceProtocolSupported,assetApiFlavor:this.assetApiFlavor,assets:this.assets.slice(),listings:this.listings.slice(),pendingOperations:this.getPendingOperations(),lastError:this.lastError,lastMessage:this.lastMessage};}
 };

@@ -100,7 +100,7 @@ function renderMarketplaceAssets(result){
   for(const asset of result.assets){
     const row=document.createElement('div');row.className='marketplace-item';
     const title=document.createElement('strong');title.textContent=asset.symbol||asset.id;
-    const value=document.createElement('span');value.textContent=(asset.name||asset.id)+' · '+(asset.balance??'—')+' WEBD';
+    const value=document.createElement('span');value.textContent=(asset.name||asset.id)+' · '+(asset.balance??'—')+' '+(asset.symbol||'WEBD');
     row.append(title,value);list.append(row);
   }
 }
@@ -122,13 +122,14 @@ async function refreshMarketplace(){
 }
 function renderMarketplaceConnection(result){
   const node=$('#marketplace-connection');
-  node.textContent=!result?.connected?t('marketplace.connectError'):result.assetProtocolSupported?t('marketplace.connected'):t('marketplace.protocolUnavailable');
-  node.classList.toggle('is-error',!result?.connected||!result?.assetProtocolSupported);
+  node.textContent=!result?.connected?t('marketplace.connectError'):result.marketplaceProtocolSupported?t('marketplace.connected'):result.assetProtocolSupported?t('marketplace.assetsConnected'):t('marketplace.protocolUnavailable');
+  node.classList.toggle('is-error',!result?.connected||!result?.marketplaceProtocolSupported);
 }
 function renderMarketplacePending(){
   const pending=marketplaceModule.getPendingOperations();
+  const state=marketplaceModule.getState();
   const retry=$('#marketplace-retry');
-  retry.disabled=pending.length===0;
+  retry.disabled=pending.length===0||!state.marketplaceProtocolSupported;
   $('#marketplace-pending-status').textContent=pending.length?t('marketplace.pendingCount',{count:pending.length}):'';
 }
 function renderHistory(history){
@@ -278,7 +279,7 @@ action('#marketplace-refresh',async()=>refreshMarketplace());
 action('#marketplace-retry',async()=>{
   let connection=marketplaceModule.getState();
   if(!connection.connected){connection=await marketplaceModule.connect();renderMarketplaceConnection(connection);}
-  if(!connection.assetProtocolSupported){renderMarketplacePending();return;}
+  if(!connection.marketplaceProtocolSupported){renderMarketplacePending();return;}
   const result=await marketplaceModule.retryPending();
   renderMarketplacePending();
   if(result.transmitted)toast(t('marketplace.retryResult',{count:result.transmitted}));
