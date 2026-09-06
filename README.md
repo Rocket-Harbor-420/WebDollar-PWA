@@ -23,7 +23,7 @@ Visita http://127.0.0.1:4173. El paquete contiene las dependencias del navegador
 | Crear/recuperar cartera | Frase BIP39 de 24 palabras propia de esta PWA; exporta .webd oficial |
 | Consultar Mainnet | Implementado y verificado en `pool.timi.ro`; el espejo `cloudns` es solo lectura |
 | Firmar transacciones | Implementado y verificado con Ed25519 independiente de Node |
-| Transmitir/reclamar en Mainnet | Sobre sendRawTransaction implementado; requiere nodo activo, saldo, mínimos y confirmación humana |
+| Transmitir/reclamar en Mainnet | Sobre sendRawTransaction implementado; requiere nodo activo, saldo, mínimos y confirmación |
 | QR/NFC offline | Generación y lectura QR completamente locales; Web NFC real con fallback QR |
 | Ecash | Vale de pago prefirmado; no es Cashu ni dinero anónimo garantizado |
 | Minería | Worker Argon2 para PoW y trabajo PoS Mainnet firmado localmente; depende de un pool activo |
