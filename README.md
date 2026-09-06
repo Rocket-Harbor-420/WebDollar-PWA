@@ -1,6 +1,6 @@
 # WebDollar Wallet · PWA Mainnet v2
 
-PWA ejecutable con importación oficial .webd, firma Ed25519 local, consulta REST, transacciones serializadas WebDollar v2, transporte offline por QR/NFC, interfaz español/inglés, instalación standalone y build TWA para Android.
+PWA ejecutable con importación oficial .webd, firma Ed25519 local, consulta REST, transacciones serializadas WebDollar v2, transporte offline por QR/NFC, interfaz en cinco idiomas, tema adaptativo, instalación standalone y build TWA para Android.
 
 **Estado: cliente Mainnet verificado con operaciones reales confirmadas bajo acción humana.** Se verificó `https://pool.timi.ro` como nodo WebDollar Mainnet sincronizado, con CORS y las rutas REST oficiales (`/`, `/top`, `/address/balance/:address`, `/address/nonce/:address`). También se añadió `https://webdollar.cloudns.nz/api` como espejo de solo lectura. En las pruebas interactivas del usuario, la PWA cargó la cartera seleccionada, mostró 333.00 WEBD y confirmó la operación `a74a54f14d59310a4c7af9d2800a5e42c8b67dca867ffcd8951732bf9b8e3bb7` en el bloque `5970000`; después se autorizó otra operación de 20 WEBD, hash `7678126f386472a7e459b1ac4698ae68df3c381ca78446d5c5c7abe73f9555f7`, confirmada en el bloque `5970546`, dejando 237.628 WEBD. El cliente usa el transporte nativo Socket.IO/Engine.IO con fallback polling verificado desde Chromium. No hay datos simulados ni saldo inicial en el código de la app.
 
@@ -27,6 +27,11 @@ Visita http://127.0.0.1:4173. El paquete contiene las dependencias del navegador
 | QR/NFC offline | Generación y lectura QR completamente locales; Web NFC real con fallback QR |
 | Ecash | Vale de pago prefirmado; no es Cashu ni dinero anónimo garantizado |
 | Minería | Worker Argon2 para PoW y trabajo PoS Mainnet firmado localmente; depende de un pool activo |
+| Idiomas y tema | Español, English, Italiano, Română, 简体中文; Sistema/Claro/Oscuro persistidos como preferencias de UI |
+| Copia cifrada | AES-256-GCM + PBKDF2-SHA-256 para exportación `.encrypted.webd`, con roundtrip probado |
+| Métricas de minería | Aceptados, rechazados, latencia, uptime, trabajos e intentos en memoria de sesión |
+| Mensajería | Deep links para compartir dirección y vale por WhatsApp, Telegram y Messenger |
+| Doble gasto offline | Sobre v2 con nonce, +100 bloques de caducidad, deduplicación en sesión y verificación on-chain oportunista |
 | PWA | Service Worker e iconos PNG; instalabilidad comprobada en Chrome |
 | APK | APK debug local compilado y verificado; TWA release requiere dominio HTTPS y firma |
 
@@ -114,7 +119,7 @@ npm run build:apk:local
 El resultado es `WebDollar-wallet-debug.apk`. En esta ejecución se generó y verificó:
 
 ```text
-SHA-256: CECD02B854CEDB156FDCB43F1F82598A7F5125C96FE848F566E804364F86C47E
+SHA-256: 75F5F254ED4A7C9A18E1D7A8372B686BD456B477CB35601DF60A1DC85167EEF7
 Package: com.webdollar.wallet
 Version: 2.0.0 (20)
 ```
@@ -122,7 +127,7 @@ Version: 2.0.0 (20)
 El build local también genera `build/release/WebDollar-wallet-debug.aab` con firma debug para pruebas internas:
 
 ```text
-SHA-256: 467F071ED9F429E0EEDAFB3C00E6B33280CD0175E949043AA3138322CC38588E
+SHA-256: B712F509590C00268DA50E10713AB15086F33E43F90D802EF6AB84AC977C1007
 ```
 
 El APK/AAB local no incluye claves ni carteras. La PWA sigue exigiendo que el usuario seleccione el archivo `.webd` y confirme cualquier transmisión. La firma de depuración no debe utilizarse para publicar una versión de producción.
@@ -145,11 +150,19 @@ keytool -genkeypair -v -keystore "$env:USERPROFILE\\webdollar-release.keystore" 
 
 No subas la keystore, contraseñas ni archivos `.webd` a Git. Configura las credenciales de firma únicamente en el asistente de Bubblewrap o en un almacén seguro de CI. El AAB es el artefacto para Play Store; el APK firmado sirve para instalación directa y pruebas.
 
-## Idiomas y NFC
+## Idiomas, tema, cifrado y NFC
 
-El selector `Español / English` guarda únicamente la preferencia de idioma en `localStorage` bajo `webdollar.language`. Las claves, saldos, nonces y transacciones no se guardan allí. Las traducciones viven en `src/locales/es.json` y `src/locales/en.json`; el Service Worker incluye ambos archivos en su app shell.
+El selector ofrece Español, English, Italiano, Română y 简体中文. Guarda únicamente la preferencia de idioma en `localStorage` bajo `webdollar.language`. El selector de tema ofrece Sistema, Claro y Oscuro; solo guarda `webdollar.theme` y responde a `prefers-color-scheme`. Las claves, saldos, nonces y transacciones no se guardan allí. Las traducciones viven en `src/locales/` y el Service Worker incluye los cinco archivos en su app shell.
 
-En Android Chrome con Web NFC habilitado, `Enviar por NFC` escribe el vale firmado como un registro de texto NDEF y `Leer NFC` recupera y valida el prefijo `webd-pay-v1:`. En navegadores sin Web NFC, `Leer imagen QR` es el fallback funcional.
+**Copia cifrada:** `WalletCore.encryptWallet`/`decryptWallet` y `exportEncryptedWallet` usan el formato `webdollar-encrypted-v1`, PBKDF2-SHA-256 (210 000 iteraciones) y AES-256-GCM. La PWA descarga el texto cifrado como `.encrypted.webd`; al importarlo solicita la contraseña y descifra solo en memoria. La prueba de protocolo cubre roundtrip y contraseña incorrecta.
+
+**Métricas de minería:** la sesión muestra hashrate, trabajos aceptados/rechazados, latencia del pool, intentos y uptime. Los contadores permanecen en memoria. El worker devuelve mensajes `metrics` adicionales sin recibir claves privadas. El selector incluye `https://pool.timi.ro` y permite un endpoint HTTPS personalizado, pero el motor solo arranca cuando el nodo Mainnet configurado coincide con el pool seleccionado.
+
+**Mensajería:** el módulo `src/modules/messenger.js` comparte dirección y vales firmados mediante deep links para WhatsApp, Telegram y Messenger. No comparte semillas ni claves.
+
+En Android Chrome con Web NFC habilitado, `Enviar por NFC` escribe el vale firmado como un registro de texto NDEF y `Leer NFC` recupera y valida el prefijo `webd-pay-v1:`. Los vales nuevos llevan dentro un sobre `webdollar-ecash-v2` con nonce secuencial, expiración a +100 bloques y registro de uso en memoria. Si hay red, se consulta la cadena antes de aceptar; la validación no acredita saldo y el reclamo sigue requiriendo revisión y confirmación. En navegadores sin Web NFC, `Leer imagen QR` es el fallback funcional. El registro offline se pierde al cerrar la sesión y no puede reemplazar el consenso contra doble gasto en otra cartera.
+
+**Preparación futura desacoplada:** `src/modules/custom-nodes.js` valida identidad Mainnet, mantiene nodos como solo lectura y expone health checks antes de firmar. `src/core/interfaces.d.ts` contiene contratos para adaptadores de otras redes/activos y para Ledger WebUSB/WebHID. El diseño de marketplace WebDollar, hardware wallet y pools extendidos está en `PROPOSALS.md`; ninguno modifica el Core en esta entrega.
 
 Comprobar los comandos sin compilar ni descargar herramientas:
 
@@ -166,4 +179,4 @@ El banner de instalación PWA depende del navegador, uso previo y políticas del
 - architecture.mermaid: módulos, claves, UI, red y transporte QR.
 - PROTOCOL_EVIDENCE.md: fuentes técnicas y límites de aceptación.
 - VALIDATION.md: resultados y verificaciones pendientes.
-- PROPOSALS.md: cinco extensiones viables para futuras versiones.
+- PROPOSALS.md: diseño marketplace, Ledger WebUSB/WebHID, nodos, activos/redes y pools para futuras versiones.

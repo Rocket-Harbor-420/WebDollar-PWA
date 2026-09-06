@@ -4,16 +4,42 @@
  * Licencia MIT
  */
 const DEFAULT_LANGUAGE='es';
-const SUPPORTED_LANGUAGES=new Set(['es','en']);
+const SUPPORTED_LANGUAGES=new Set(['es','en','it','ro','zh-CN']);
 const STORAGE_KEY='webdollar.language';
+const THEME_STORAGE_KEY='webdollar.theme';
+const THEME_OPTIONS=new Set(['system','light','dark']);
 let language=DEFAULT_LANGUAGE;
 let messages={};
+let theme='system';
+let themeMediaQuery=null;
 
 function interpolate(value,params={}){
   return String(value).replace(/\{(\w+)\}/g,(_,key)=>params[key]===undefined?`{${key}}`:String(params[key]));
 }
 export function getLanguage(){return language;}
 export function t(key,params={}){return interpolate(messages[key]??key,params);}
+export function getTheme(){return theme;}
+export function effectiveTheme(){return theme==='system'&&themeMediaQuery?themeMediaQuery.matches?'dark':'light':theme;}
+export function applyTheme(){
+  const active=effectiveTheme();
+  document.documentElement.classList.toggle('dark-theme',active==='dark');
+  document.documentElement.dataset.theme=active;
+  document.documentElement.style.colorScheme=active;
+}
+export function themeOptions(){return [...THEME_OPTIONS];}
+export async function loadTheme(next){
+  theme=THEME_OPTIONS.has(next)?next:'system';
+  try{localStorage.setItem(THEME_STORAGE_KEY,theme);}catch{}
+  applyTheme();
+  return theme;
+}
+export async function initTheme(){
+  try{theme=THEME_OPTIONS.has(localStorage.getItem(THEME_STORAGE_KEY))?localStorage.getItem(THEME_STORAGE_KEY):'system';}catch{theme='system';}
+  themeMediaQuery=window.matchMedia?.('(prefers-color-scheme: dark)')||null;
+  themeMediaQuery?.addEventListener?.('change',()=>{if(theme==='system')applyTheme();});
+  applyTheme();
+  return theme;
+}
 export async function loadLanguage(next){
   const selected=SUPPORTED_LANGUAGES.has(next)?next:DEFAULT_LANGUAGE;
   const response=await fetch(`./src/locales/${selected}.json`,{cache:'no-store'});

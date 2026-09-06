@@ -23,10 +23,12 @@ self.onmessage=async({data})=>{
       const result=await self.argon2.hash({pass:concat(block,u32(nonce)),salt:'Satoshi_is_Finney',time:2,mem:256,parallelism:2,type:self.argon2.ArgonType.Argon2d,hashLen:32});
       const hash=result.hash instanceof Uint8Array?result.hash:new Uint8Array(result.hash);worked++;
       if(compare(hash,best)<0){best=hash;bestNonce=nonce;}
-      if(compare(hash,target)<=0){self.postMessage({type:'result',result:true,hash,nonce,hashes:worked,elapsed:performance.now()-started});return;}
-      if((worked&3)===0)self.postMessage({type:'rate',rate:worked/Math.max(.001,(performance.now()-started)/1000)});
+      const elapsed=performance.now()-started;
+      if(compare(hash,target)<=0){self.postMessage({type:'result',result:true,hash,nonce,hashes:worked,elapsed,attempts:worked,bestHash:best});return;}
+      if((worked&3)===0){const rate=worked/Math.max(.001,elapsed/1000);self.postMessage({type:'rate',rate,hashes:worked,elapsed});}
+      if((worked&15)===0){const rate=worked/Math.max(.001,elapsed/1000);self.postMessage({type:'metrics',rate,hashes:worked,elapsed,bestHash:best});}
       nonce++;
     }
-    if(!stopped)self.postMessage({type:'result',result:false,hash:best,nonce:bestNonce,hashes:worked,elapsed:performance.now()-started});
+    if(!stopped)self.postMessage({type:'result',result:false,hash:best,nonce:bestNonce,hashes:worked,attempts:worked,elapsed:performance.now()-started,bestHash:best});
   }catch(error){self.postMessage({type:'error',message:error?.message||String(error)});}
 };

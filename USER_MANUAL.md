@@ -90,3 +90,41 @@ La interfaz usa el mismo flujo en escritorio, tablet y móvil; el selector de id
 Desde la carpeta del proyecto ejecuta `npm run build:apk:local`. El resultado es `WebDollar-wallet-debug.apk`, firmado con la clave de depuración para pruebas. Puedes abrirlo en un emulador o instalarlo con `adb install -r WebDollar-wallet-debug.apk` si Android Platform Tools está disponible. Esta variante contiene los archivos de la PWA dentro de un WebView; no contiene la cartera física ni una semilla inicial.
 
 La prueba automatizada comprueba ausencia de desplazamiento horizontal en 1440, 375 y 320 px. La verificación de Web NFC depende de un dispositivo Android con NFC; Safari/iOS usa el fallback QR.
+
+## Idiomas y tema
+
+En el pie de página puedes cambiar entre Español, English, Italiano, Română y 简体中文. La selección se conserva en el dispositivo como `webdollar.language`. En **Tema** elige **Sistema** para seguir `prefers-color-scheme`, o selecciona **Claro**/**Oscuro** manualmente; la preferencia se guarda como `webdollar.theme` y no contiene información de la cartera.
+
+## Copia cifrada de la cartera
+
+1. Con una cartera desbloqueada, pulsa **Cifrar y descargar**.
+2. Introduce una contraseña de al menos 8 caracteres y repítela.
+3. Guarda el archivo `.encrypted.webd` fuera del repositorio. El archivo usa AES-256-GCM y una derivación PBKDF2-SHA-256 con salt aleatorio; la contraseña no se envía a la red.
+4. Para restaurarlo, pulsa **Importar .webd**, selecciona el archivo cifrado y escribe la contraseña cuando la PWA la solicite. La aplicación descifra en memoria, valida la dirección y las claves, y después consulta Mainnet.
+
+Si olvidas la contraseña, el archivo cifrado no puede recuperarse desde la PWA. El archivo `.webd` sin cifrar y la frase de recuperación siguen siendo respaldos distintos: protégelos con el mismo cuidado que el efectivo.
+
+## Métricas de minería y pool
+
+La tarjeta de minería muestra trabajos aceptados/rechazados, latencia del pool y tiempo de sesión además del hashrate. Los contadores son temporales y desaparecen al detener o recargar la app; no se escriben en `localStorage`. **Timi Mainnet** es el pool predefinido. El campo de pool personalizado solo admite HTTPS y el motor exige que el nodo configurado corresponda al endpoint seleccionado.
+
+## Compartir por WhatsApp, Telegram y Messenger
+
+En **Tu dirección** selecciona un canal y pulsa **Compartir dirección**. En el diálogo offline, después de generar un vale firmado, selecciona el canal y pulsa **Compartir vale**. Se abren deep links del servicio elegido. La dirección es pública; el vale contiene únicamente la transacción ya firmada. Nunca se comparte la semilla, la clave privada ni la contraseña.
+
+## Protección del vale offline
+
+Los vales nuevos usan un sobre v2 que conserva la transacción firmada y añade un nonce del emisor, una identificación del vale y una caducidad a 100 bloques desde la consulta usada para crearlo. La instancia receptora mantiene un registro en memoria para rechazar el mismo vale o un nonce repetido en la misma sesión. Si hay red, intenta consultar la cadena antes de aceptar; si no hay red, la app muestra el estado como no verificado. Esto reduce replay accidental, pero no reemplaza el consenso: otra cartera puede gastar el nonce mientras el emisor está offline, el emisor puede dejar un nonce obsoleto y el registro se pierde al cerrar la aplicación. El reclamo siempre requiere conexión, revisión y confirmación humana.
+
+### Captura simulada actualizada
+
+```text
+┌────────────────────────────────────────────────────────┐
+│ WebDollar   [Saldo] [Tema: Sistema] [Idioma: Español]  │
+│ Saldo en cadena             Minería                     │
+│ 333.00 WEBD                0 H/s  Acept.  Rech. Lat.   │
+│ [Cifrar y descargar]       [Iniciar minería]            │
+│ Tu dirección [QR]  [Copiar] [WhatsApp] [Compartir]     │
+│ Offline: [QR] [NFC] [Vale monouso +100 bloques]       │
+└────────────────────────────────────────────────────────┘
+```

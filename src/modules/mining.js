@@ -41,26 +41,34 @@ function posHeader(serializedBlock,timestamp){const block=bytes(serializedBlock)
 function posHash(serializedBlock,target,address,timestamp,height,balance){const block=bytes(serializedBlock),start=headerStart(block),hashPrev=block.slice(start+2,start+34),digest=sha256(concat(optimized(u32(height)),optimized(target),optimized(hashPrev),optimized(address),optimized(u32(timestamp))));const units=BigInt(balance);if(units<POS_MINIMUM_UNITS)throw new Error('La dirección de minería necesita al menos 100 WEBD para PoS.');return fixed32(asBigInt(digest)/units);}
 function signedPoolMessage(message,answer){return concat(message,ascii(answer.name),ascii(answer.fee),ascii(answer.website),ascii(JSON.stringify(answer.servers)),ascii(answer.useSig));}
 
-function createMainnetMiningEngine(core,endpoint){
+function createMainnetMiningEngine(core,endpoint,callbacks={}){
   let runtime=null;
   async function schedule(work){
     if(!runtime?.running)return;
     const normalized=poolWorkData(work);if(!normalized?.h||!normalized.s||!normalized.t)throw new Error('Trabajo de pool incompleto.');
-    runtime.work=normalized;runtime.generation++;const generation=runtime.generation;runtime.powCancel?.();
+    runtime.work=normalized;runtime.generation++;runtime.jobs++;callbacks.onJob?.(normalized);runtime.onMetrics?.({jobs:runtime.jobs});runtime.powCancel?.();
     if(runtime.workPromise){try{await runtime.workPromise;}catch{}if(!runtime?.running||runtime.generation!==generation)return;}
     runtime.workPromise=mine(normalized,generation).finally(()=>{if(runtime)runtime.workPromise=null;});await runtime.workPromise;
   }
   async function submit(work,payload){
-    const response=await runtime.socket.requestWithBinary('mining-pool/work-done',{work:payload},12000);
-    const next=poolWorkData(response.data?.newWork||response.data?.work);if(next)await schedule(next);
+    const submittedAt=performance.now();
+    try{
+      const response=await runtime.socket.requestWithBinary('mining-pool/work-done',{work:payload},12000);
+      const latencyMs=performance.now()-submittedAt;callbacks.onLatency?.(latencyMs);runtime.onMetrics?.({latencyMs});
+      if(response.data?.accepted===false||response.data?.result===false){callbacks.onRejected?.();throw new Error('El pool rechazó el trabajo de minería.');}
+      callbacks.onAccepted?.();runtime.accepted++;runtime.onMetrics?.({accepted:runtime.accepted});
+      const next=poolWorkData(response.data?.newWork||response.data?.work);if(next)await schedule(next);
+    }catch(error){if(!responseWasHandled(error))callbacks.onRejected?.();throw error;}
   }
+  function responseWasHandled(error){return error?.message==='El pool rechazó el trabajo de minería.';}
   async function minePow(work,generation){
     const worker=new Worker(new URL('../workers/mining-pow-worker.js',import.meta.url));runtime.powWorker=worker;
     await new Promise((resolve,reject)=>{
       const cancel=()=>{if(runtime?.powCancel===cancel)runtime.powCancel=null;worker.terminate();if(runtime?.powWorker===worker)runtime.powWorker=null;resolve();};runtime.powCancel=cancel;
       const cleanup=()=>{if(runtime?.powCancel===cancel)runtime.powCancel=null;};
       worker.onmessage=async({data})=>{
-        if(data.type==='rate'){runtime?.onRate?.(data.rate);return;}
+        if(data.type==='rate'){runtime?.onRate?.(data.rate);runtime?.onMetrics?.({hashes:data.hashes,workerRate:data.rate});return;}
+        if(data.type==='metrics'){runtime?.onRate?.(data.rate);runtime?.onMetrics?.({hashes:data.hashes,workerRate:data.rate,bestHash:data.bestHash});return;}
         if(data.type==='error'){cleanup();worker.terminate();runtime.powWorker=null;reject(new Error(data.message));return;}
         if(data.type!=='result'||!runtime?.running||runtime.generation!==generation){cleanup();worker.terminate();runtime.powWorker=null;resolve();return;}
         try{await submit(work,{result:data.result,hash:data.hash,nonce:data.nonce,id:work.I??work.h,h:work.h,timeDiff:data.elapsed,hashes:data.hashes});cleanup();worker.terminate();runtime.powWorker=null;resolve();}catch(error){cleanup();worker.terminate();runtime.powWorker=null;reject(error);}
@@ -80,12 +88,12 @@ function createMainnetMiningEngine(core,endpoint){
         const header=posHeader(serialized,timestamp),signed=core.signPoSHeader?.(header);if(!signed)throw new Error('El Core no expone el firmador PoS local.');
         await submit(work,{result:true,hash,nonce:0,id:work.I??work.h,h:work.h,timeDiff:Math.max(1,performance.now()-runtime.startedAt),pos:{timestamp,posSignature:signed.signature,posMinerAddress:miner,posMinerPublicKey:signed.publicKey,balance}});return;
       }
-      timestamp++;if(timestamp>startTimestamp+3600)return;if((runtime.attempts&127)===0)await new Promise(resolve=>setTimeout(resolve,0));
+      timestamp++;if(timestamp>startTimestamp+3600)return;if((runtime.attempts&127)===0){runtime.onMetrics?.({hashes:runtime.attempts});await new Promise(resolve=>setTimeout(resolve,0));}
     }
   }
   return {
-    async start({address,onRate}){
-      if(runtime?.running)return;const accountAddress=decodeWebdAddress(address);const state={running:true,generation:0,attempts:0,startedAt:performance.now(),socket:null,work:null,workPromise:null,onRate};runtime=state;
+    async start({address,onRate,onMetrics}){
+      if(runtime?.running)return;const accountAddress=decodeWebdAddress(address);const state={running:true,generation:0,attempts:0,jobs:0,accepted:0,startedAt:performance.now(),socket:null,work:null,workPromise:null,onRate,onMetrics};runtime=state;
       const socket=new NativeWebDollarSocket(endpoint,{nodeConsensusType:MINER_POOL_NODE_CONSENSUS_TYPE,timeoutMs:12000});state.socket=socket;
       try{
         await socket.connect();const message=new Uint8Array(32);crypto.getRandomValues(message);
@@ -102,13 +110,26 @@ function createMainnetMiningEngine(core,endpoint){
   };
 }
 
+const DEFAULT_POOLS=[{id:'timi',name:'Timi Mainnet',endpoint:MAINNET_MINING_ENDPOINT,network:'mainnet'}];
 export const miningModule={
-  id:'mining',name:'Minería WebDollar',running:false,lastHashRate:0,engine:null,
+  id:'mining',name:'Minería WebDollar',running:false,lastHashRate:0,engine:null,engineEndpoint:null,pools:[...DEFAULT_POOLS],selectedPoolId:'timi',metrics:{accepted:0,rejected:0,latencyMs:null,hashes:0,jobs:0,startedAt:null},
   init(core){this.core=core;},
+  getPools(){return this.pools.map(pool=>({...pool}));},
+  getSelectedPool(){return this.pools.find(pool=>pool.id===this.selectedPoolId)||this.pools[0];},
+  setPool(id){if(this.running)throw new Error('Detén la minería antes de cambiar de pool.');if(!this.pools.some(pool=>pool.id===id))throw new Error('Pool no registrado.');this.selectedPoolId=id;return this.getSelectedPool();},
+  addCustomPool(endpoint,name='Pool personalizado'){
+    let url;try{url=new URL(endpoint);}catch{throw new Error('La URL del pool no es válida.');}
+    if(url.protocol!=='https:')throw new Error('El pool personalizado debe usar HTTPS.');
+    const pool={id:'custom-'+btoa(url.href).replace(/[^a-z0-9]/gi,'').slice(0,12),name,endpoint:url.href,network:'mainnet',custom:true};
+    this.pools=[...this.pools.filter(item=>!item.custom),pool];this.selectedPoolId=pool.id;return {...pool};
+  },
+  getMetrics(){const uptimeMs=this.metrics.startedAt?(this.running?Date.now()-this.metrics.startedAt:this.metrics.uptimeMs||0):0;return {...this.metrics,uptimeMs,running:this.running};},
+  emitMetrics(){this.core?.events.emit('mining:metrics',this.getMetrics());},
+  resetMetrics(){this.metrics={accepted:0,rejected:0,latencyMs:null,hashes:0,jobs:0,startedAt:Date.now(),uptimeMs:0};this.emitMetrics();},
   attachEngine(engine){if(!engine||typeof engine.start!=='function'||typeof engine.stop!=='function')throw new Error('Motor de minería incompatible.');this.engine=engine;},
-  attachWorkerEngine(moduleUrl){const url=new URL(moduleUrl,location.href);if(url.origin!==location.origin)throw new Error('El motor debe alojarse con la PWA.');let worker=null;this.attachEngine({start:({address,balance,onRate})=>new Promise((resolve,reject)=>{worker=new Worker(new URL('../workers/mining-worker.js',import.meta.url),{type:'module'});const timeout=setTimeout(()=>{worker.terminate();reject(new Error('El motor no respondió.'));},15000);worker.onmessage=({data})=>{if(data.type==='started'){clearTimeout(timeout);resolve();}if(data.type==='rate')onRate(data.rate);if(data.type==='error'){clearTimeout(timeout);reject(new Error(data.message));this.core.events.emit('module:error',{id:this.id,error:{message:data.message}});}};worker.onerror=()=>{clearTimeout(timeout);reject(new Error('Fallo del worker de minería.'));this.core.events.emit('module:error',{id:this.id,error:{message:'Fallo del worker de minería.'}});};worker.postMessage({type:'start',moduleUrl:url.href,address,balance});}),stop:()=>{worker?.postMessage({type:'stop'});worker?.terminate();worker=null;}});},
-  async startMining(){if(!this.engine&&this.core?.getNetworkSource?.()===MAINNET_MINING_ENDPOINT)this.engine=createMainnetMiningEngine(this.core,MAINNET_MINING_ENDPOINT);if(!this.engine)throw new Error('No hay un motor de consenso WebDollar conectado para este nodo.');try{await this.engine.start({address:this.core.getAddress(),balance:this.core.getBalance(),onRate:rate=>{if(Number.isFinite(rate)&&rate>=0){this.lastHashRate=rate;this.core.events.emit('mining:rate',rate);}}});this.running=true;this.core.events.emit('mining:state',{running:true});}catch(error){this.dispose();throw error;}},
-  stopMining(){this.engine?.stop();this.running=false;this.lastHashRate=0;this.core?.events.emit('mining:state',{running:false});},
+  attachWorkerEngine(moduleUrl){const url=new URL(moduleUrl,location.href);if(url.origin!==location.origin)throw new Error('El motor debe alojarse con la PWA.');let worker=null;this.attachEngine({start:({address,balance,onRate,onMetrics})=>new Promise((resolve,reject)=>{worker=new Worker(new URL('../workers/mining-worker.js',import.meta.url),{type:'module'});const timeout=setTimeout(()=>{worker.terminate();reject(new Error('El motor no respondió.'));},15000);worker.onmessage=({data})=>{if(data.type==='started'){clearTimeout(timeout);resolve();}if(data.type==='rate')onRate(data.rate);if(data.type==='metrics')onMetrics?.(data);if(data.type==='error'){clearTimeout(timeout);reject(new Error(data.message));this.core.events.emit('module:error',{id:this.id,error:{message:data.message}});}};worker.onerror=()=>{clearTimeout(timeout);reject(new Error('Fallo del worker de minería.'));this.core.events.emit('module:error',{id:this.id,error:{message:'Fallo del worker de minería.'}});};worker.postMessage({type:'start',moduleUrl:url.href,address,balance});}),stop:()=>{worker?.postMessage({type:'stop'});worker?.terminate();worker=null;}});},
+  async startMining(){const pool=this.getSelectedPool();if(!this.engine&&this.core?.getNetworkSource?.()===pool.endpoint){this.engine=createMainnetMiningEngine(this.core,pool.endpoint,{onAccepted:()=>{this.metrics.accepted++;this.emitMetrics();},onRejected:()=>{this.metrics.rejected++;this.emitMetrics();},onLatency:latencyMs=>{this.metrics.latencyMs=Math.round(latencyMs);this.emitMetrics();},onJob:()=>{this.metrics.jobs++;this.emitMetrics();}});this.engineEndpoint=pool.endpoint;}if(!this.engine)throw new Error('No hay un motor de consenso WebDollar conectado para este nodo.');this.resetMetrics();try{await this.engine.start({address:this.core.getAddress(),balance:this.core.getBalance(),onRate:rate=>{if(Number.isFinite(rate)&&rate>=0){this.lastHashRate=rate;this.core.events.emit('mining:rate',rate);}},onMetrics:payload=>{if(Number.isFinite(payload?.hashes))this.metrics.hashes=Math.max(this.metrics.hashes,payload.hashes);if(Number.isFinite(payload?.latencyMs))this.metrics.latencyMs=Math.round(payload.latencyMs);this.emitMetrics();}});this.running=true;this.core.events.emit('mining:state',{running:true});this.emitMetrics();}catch(error){this.dispose();throw error;}},
+  stopMining(){this.engine?.stop();this.metrics.uptimeMs=this.metrics.startedAt?Date.now()-this.metrics.startedAt:0;this.running=false;this.lastHashRate=0;if(this.engineEndpoint){this.engine=null;this.engineEndpoint=null;}this.core?.events.emit('mining:state',{running:false});this.emitMetrics();},
   getHashRate(){return this.lastHashRate;},
-  dispose(){try{this.engine?.stop();}finally{this.running=false;this.lastHashRate=0;}}
+  dispose(){try{this.engine?.stop();}finally{if(this.engineEndpoint){this.engine=null;this.engineEndpoint=null;}this.metrics.uptimeMs=this.metrics.startedAt?Date.now()-this.metrics.startedAt:0;this.running=false;this.lastHashRate=0;this.core?.events.emit('mining:state',{running:false});this.emitMetrics();}}
 };

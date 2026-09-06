@@ -113,15 +113,51 @@ También existe attachMiningEngine(engine) para un adaptador que ya gestione su 
 
 ## Pago offline
 
-El payload es webd-pay-v1: seguido de base64 de la transacción firmada. El receptor verifica bytes, firma, outputs y dirección receptora. Los metadatos económicos se extraen del binario firmado y no de campos JSON editables.
+El transporte conserva el prefijo `webd-pay-v1:` para QR/NFC, pero los vales nuevos contienen base64 de un sobre `webdollar-ecash-v2`. El receptor decodifica el sobre, vuelve a verificar los 167 bytes, firma, outputs, dirección, `voucherId`, emisor y nonce. Los metadatos económicos se extraen del binario firmado y no de campos JSON editables.
 
-No hay mint Cashu ni blind signatures. No hay garantía contra doble gasto antes de confirmación. Las reservas y deduplicación son solo de sesión; otra instancia de la cartera puede gastar el mismo nonce. La reconexión abre la posibilidad de revisión, sin broadcast automático.
+El sobre incluye expiración a `altura + 100`; cada instancia mantiene un registro en memoria de vouchers y nonces y rechaza replay. `verifyOnChain` consulta la cadena cuando está disponible antes de aceptar. No hay mint Cashu ni blind signatures y no hay garantía contra doble gasto entre carteras independientes antes de confirmación. La reconexión abre la revisión, sin broadcast automático.
 
 ## Caché y build
 
 El Service Worker solo cachea recursos estáticos enumerados, nunca APIs. El bundle de dependencias está versionado en package-lock.json y se regenera con npm run build:assets. Los archivos fuente modulares se sirven directamente con Live Server.
 ## Internacionalización y transporte NFC
 
-La UI carga `src/locales/es.json` y `src/locales/en.json` mediante `src/core/i18n.js`. Un módulo nuevo debe usar `t(key, params)` para mensajes dinámicos y atributos `data-i18n` para texto estático; no debe persistir secretos. La preferencia se guarda como `webdollar.language` y no contiene claves, saldos ni nonces.
+La UI carga `src/locales/es.json`, `en.json`, `it.json`, `ro.json` y `zh-CN.json` mediante `src/core/i18n.js`. Un módulo nuevo debe usar `t(key, params)` para mensajes dinámicos y atributos `data-i18n` para texto estático; no debe persistir secretos. La preferencia se guarda como `webdollar.language` y no contiene claves, saldos ni nonces. El tema usa `webdollar.theme` y la clase `dark-theme` sin mezclarlo con el estado de la cartera.
 
 `offlineModule.writeViaNFC(amount, to)` y `offlineModule.readViaNFC()` encapsulan Web NFC mediante `NDEFReader`. Si el navegador no expone esa API, lanzan un error controlado para que la UI mantenga el flujo QR (`sendViaNFC` / `scanQrImage`). Un módulo no debe acceder a `WalletCore` ni al almacenamiento privado directamente.
+
+## Internacionalización y tema
+
+`src/core/i18n.js` soporta `es`, `en`, `it`, `ro` y `zh-CN`. Las traducciones viven en `src/locales/*.json` y se cargan con `loadLanguage(code)`. La preferencia se conserva únicamente bajo `webdollar.language`; los módulos deben usar `t(key, params)` en mensajes dinámicos y `data-i18n` en texto estático.
+
+El tema soporta `system`, `light` y `dark`. `initTheme()` sigue `prefers-color-scheme`; `loadTheme(value)` aplica la clase `dark-theme` y persiste solamente `webdollar.theme`. Ninguno de los dos valores contiene saldos, nonces, semillas o transacciones.
+
+## Cifrado de cartera
+
+`encryptWallet(walletData, password)` y `decryptWallet(encryptedData, password)` son funciones exportadas por `src/core/wallet.js` y también están disponibles como métodos de `WalletCore`. El formato propio `webdollar-encrypted-v1` contiene `format`, `kdf`, `iterations`, `cipher`, `salt`, `iv` y `data`; usa PBKDF2-HMAC-SHA-256 con 210 000 iteraciones, salt aleatorio de 16 bytes, IV AES-GCM de 12 bytes y AES-256-GCM. El JSON cifrado no se guarda en `localStorage`: el usuario lo descarga como `.encrypted.webd` y la importación solicita la contraseña mediante `passwordProvider`.
+
+La UI llama internamente `exportEncryptedWallet(password)` sobre su instancia privada y usa `decryptWallet` durante la importación. La instancia real de `WalletCore` no se expone en `window`: un plugin público nunca recibe la clave privada ni el objeto WalletCore. Un integrador puede reutilizar las funciones exportadas en un entorno de confianza, pero debe conservar la misma regla de no publicar el texto claro.
+
+## Métricas y selección de pool
+
+`miningModule.getMetrics()` devuelve `{accepted,rejected,latencyMs,hashes,jobs,uptimeMs,running}`. Los contadores se reinician al iniciar una sesión y viven únicamente en memoria. `mining:metrics` se emite después de cada actualización. El worker Argon2 envía mensajes `rate` y `metrics` con intentos, tasa, tiempo transcurrido y mejor hash observado; no recibe claves privadas.
+
+`getPools()`, `setPool(id)` y `addCustomPool(endpoint,name)` forman el selector de pool. El pool personalizado solo admite `https:` y el motor comienza cuando el endpoint seleccionado coincide con el nodo Mainnet configurado, evitando que la UI parezca conectada a un pool no verificado.
+
+## Compartir por mensajería
+
+`messengerModule.shareAddress(platform,address)` y `shareVoucher(platform,payload)` aceptan `whatsapp`, `telegram` o `messenger` y devuelven el deep link que se abre en una pestaña nueva. El primer hook comparte únicamente una dirección pública; el segundo comparte un vale ya firmado. Ningún hook recibe semilla, clave privada o contraseña.
+
+## Vale Ecash v2 y límites offline
+
+El prefijo de transporte sigue siendo `webd-pay-v1:` por compatibilidad QR/NFC, pero el contenido nuevo es base64 de un sobre `webdollar-ecash-v2`. El sobre incluye el hash de la transacción, emisor, nonce secuencial, altura de caducidad (`altura actual + 100`) y los 167 bytes firmados. El receptor vuelve a inspeccionar la firma y comprueba que los metadatos coincidan.
+
+Cada instancia mantiene en memoria un registro de vouchers, nonces y reclamos. Un segundo intento con el mismo voucher o con un nonce no creciente se rechaza. Cuando la red está disponible, `verifyOnChain(payload)` consulta el estado antes de aceptar; la falta de conexión no se convierte en una confirmación. El saldo no se acredita al validar: el reclamo sigue pasando por revisión humana, política Mainnet y transmisión explícita. El registro se pierde al cerrar la sesión, por lo que no es una garantía de consenso contra otra cartera que gaste el mismo nonce.
+
+## Nodos, redes y hardware preparados
+
+`customNodesModule` es un esqueleto desconectado para registrar endpoints HTTPS/WSS con identidad WebDollar Mainnet, indicador `readOnly`, `healthCheck(node)` y `signingGuard(node)`. Un futuro adaptador debe pasar la prueba de identidad y salud antes de solicitar firma; el módulo actual no cambia el adaptador Mainnet ni habilita transmisión por sí solo.
+
+`INetworkAdapter` y `IAssetAdapter` en `src/core/interfaces.d.ts` son contratos para otras redes y activos. Exponen balance, nonce, cotización, construcción sin firmar y broadcast como capacidades del adaptador; el Core WebDollar no necesita modificarse para registrarlos mediante un plugin.
+
+La interfaz `HardwareSigner` define `connect`, `getPublicKey`, `signHash` y `disconnect`, con transporte `usb` o `hid`. La implementación futura de Ledger debe utilizar WebUSB/WebHID, mostrar el path y el resumen al usuario, firmar en el dispositivo y devolver solo la firma. La clave privada nunca debe entrar en la PWA; el diseño detallado queda documentado en `PROPOSALS.md`.

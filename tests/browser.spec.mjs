@@ -121,3 +121,17 @@ test('service worker offline reload contains shell, never node or wallet files',
   for(const url of urls){expect(url).toMatch(/^http:\/\/127\.0\.0\.1:4173\//);expect(url).not.toMatch(/balance|nonce|\.webd/);}
   await context.setOffline(false);
 });
+
+test('all supported locales and persistent theme controls apply without touching wallet state',async({page})=>{
+  await page.goto(origin);
+  await page.locator('#lang-select').selectOption('zh-CN');
+  await expect(page.locator('html')).toHaveAttribute('lang','zh-CN');
+  await expect(page.locator('[data-i18n="hero.title.first"]')).toHaveText('你的余额，');
+  await page.locator('#theme-select').selectOption('dark');
+  await expect(page.locator('html')).toHaveClass(/dark-theme/);
+  expect(await page.evaluate(()=>({language:localStorage.getItem('webdollar.language'),theme:localStorage.getItem('webdollar.theme'),keys:Object.keys(localStorage)}))).toEqual({language:'zh-CN',theme:'dark',keys:['webdollar.language','webdollar.theme']});
+  await page.reload();
+  await expect(page.locator('#lang-select')).toHaveValue('zh-CN');
+  await expect(page.locator('#theme-select')).toHaveValue('dark');
+  await expect(page.locator('html')).toHaveClass(/dark-theme/);
+});

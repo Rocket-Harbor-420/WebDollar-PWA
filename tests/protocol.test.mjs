@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createPrivateKey,createPublicKey,verify,createHash } from 'node:crypto';
+import { createPrivateKey,createPublicKey,verify,createHash,webcrypto } from 'node:crypto';
 import { EventBus } from '../src/core/event-bus.js';
 import { WalletCore } from '../src/core/wallet.js';
 import { MainnetNetworkAdapter } from '../src/core/network.js';
@@ -9,6 +9,10 @@ import { parseWebdWallet,privateKeyWif,bytesToHex,encodeWebdAddress,decodeWebdAd
 import { calculateTransfer,buildAndSignMainnetTransaction,inspectSignedTransaction,rpcEnvelope,FEE_ADDRESS,FIXED_FEE_UNITS,getPolicyIssues,minerFeeUnitsForBytes } from '../src/core/transaction.js';
 import { socketEventPacket,socketBinaryEventPacket } from '../src/core/native-socket.js';
 import { fixtureAccount,fixtureFile,fixtureSnapshot } from './fixtures.mjs';
+import { encryptWallet,decryptWallet } from '../src/core/wallet.js';
+import { offlineModule } from '../src/modules/offline.js';
+
+if(!globalThis.crypto)globalThis.crypto=webcrypto;
 
 test('fixture Ed25519 RFC8032: private/public/address export compatible',()=>{
   const a=fixtureAccount();
@@ -163,6 +167,24 @@ test('plugin initialization and runtime errors are isolated from wallet',async()
   await manager.initializeAll();assert.equal(manager.getStatus('broken'),'failed');assert.equal(manager.getStatus('healthy'),'active');
   events.emit('module:error',{id:'healthy',error:{message:'Worker crashed'}});assert.equal(manager.getStatus('healthy'),'failed');assert.equal(disposed,true);
   assert.equal(hooks.getBalance(),333);
+});
+
+test('AES-GCM encrypted wallet roundtrip rejects a wrong password',async()=>{
+  const clear=JSON.stringify({version:'0.1',address:fixtureAccount().address,privateKey:'sensitive-test-material'});
+  const encrypted=await encryptWallet(clear,'correct horse battery');
+  assert.notEqual(encrypted,clear);assert.equal(await decryptWallet(encrypted,'correct horse battery'),clear);
+  await assert.rejects(()=>decryptWallet(encrypted,'wrong password'),/descifrar|password/i);
+});
+
+test('offline v2 envelope rejects the same voucher and nonce twice',async()=>{
+  const senderNetwork={subscribeBalance(address,handler){handler({...fixtureSnapshot(address),fetchedAt:Date.now(),readOnly:false,synchronized:true});return ()=>{};},async getSnapshot(address){return {...fixtureSnapshot(address),fetchedAt:Date.now(),readOnly:false,synchronized:true};}};
+  const sender=new WalletCore(new EventBus(),senderNetwork);await sender.importFile(fixtureFile());
+  offlineModule.init({prepareOffline:data=>sender.prepareOffline(data),getSnapshot:()=>sender.publicState().snapshot});
+  const packet=offlineModule.sendViaNFC('100',FEE_ADDRESS);
+  const recipient=new WalletCore(new EventBus(),senderNetwork);recipient.watch(FEE_ADDRESS);
+  offlineModule.init({getAddress:()=>FEE_ADDRESS,getSnapshot:()=>recipient.publicState().snapshot,receiveSigned:base64=>recipient.receiveSigned(base64),requestClaim:()=>({reviewRequired:true,txId:packet.voucher.txId})});
+  const received=offlineModule.receiveViaNFC(packet.payload);assert.equal(received.recipientAmount,90);
+  assert.throws(()=>offlineModule.receiveViaNFC(packet.payload),/nonce|registrado/i);
 });
 
 test('native WebDollar Socket.IO packets are deterministic',()=>{

@@ -15,7 +15,7 @@ self.onmessage=async ({data})=>{
       if(typeof engine?.start!=='function'||typeof engine?.stop!=='function')throw new Error('Contrato del motor incompatible.');
       await engine.start({address:data.address,balance:data.balance,onRate:rate=>{
         if(Number.isFinite(rate)&&rate>=0)self.postMessage({type:'rate',rate});
-      }});
+      },onMetrics:metrics=>self.postMessage({type:'metrics',...metrics})});
       self.postMessage({type:'started'});
     }else if(data.type==='stop'){
       await engine?.stop();self.postMessage({type:'stopped'});

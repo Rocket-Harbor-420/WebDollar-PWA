@@ -8,9 +8,15 @@ flowchart LR
   Node[Nodo WebDollar Mainnet externo]
   Bus{{EventBus}}
   PM[PluginManager / init y fallos aislados]
-  Mining[Módulo minería / motor pendiente]
+  Mining[Módulo minería / PoW Argon2 + PoS]
   Worker[Host Web Worker / sin claves]
-  Offline[Módulo offline / transacción firmada]
+  Metrics[Telemetría sesión / hash accepted rejected latency uptime]
+  Offline[Módulo offline / Ecash v2 nonce + timelock]
+  Messenger[Módulo mensajería / deep links]
+  Nodes[Módulo nodos personalizados / read-only health]
+  Adapters[Interfaces redes y activos]
+  Ledger[Interfaz Ledger WebUSB/WebHID futura]
+  Theme[I18n 5 idiomas + tema system/light/dark]
   QR[QR local / lectura de imagen]
   Receiver[Otra instancia / validar firma]
   Cache[(Caché estática PWA)]
@@ -28,11 +34,21 @@ flowchart LR
   UI --> PM
   PM --> Mining
   PM --> Offline
+  PM --> Messenger
+  PM --> Nodes
   Mining -->|dirección y saldo por hooks| Core
   Mining --> Worker
+  Worker -->|rate + metrics| Metrics
+  Metrics --> UI
   Offline -->|preparar / recibir firmado| Core
+  Offline -->|nonce + caducidad + deduplicación| Receiver
   Offline --> QR
   QR --> Receiver
   Receiver -->|revisar reclamo| UI
+  UI -->|compartir dirección/vale| Messenger
+  Nodes -->|identidad y salud antes de firmar| Net
+  Adapters -.->|plugins futuros| PM
+  Ledger -.->|firma externa sin clave privada| Core
+  Theme --> UI
   Bus --> UI
   UI -->|service worker solo app shell| Cache

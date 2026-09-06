@@ -4,9 +4,51 @@
  * Licencia MIT
  */
 import { accountFromMnemonic, newMnemonic } from './crypto.js';
-import { parseWebdWallet, decodeWebdAddress, privateKeyWif, bytesToHex } from './webd-format.js';
+import { parseWebdWallet, decodeWebdAddress, privateKeyWif, bytesToHex, bytesToBase64, base64ToBytes } from './webd-format.js';
 import { calculateTransfer, withMinerFee, getPolicyIssues, buildAndSignMainnetTransaction, inspectSignedTransaction } from './transaction.js';
 import { signEd25519 } from './ed25519.js';
+
+const ENCRYPTED_WALLET_FORMAT='webdollar-encrypted-v1';
+const PBKDF2_ITERATIONS=210000;
+const textEncoder=new TextEncoder();
+const textDecoder=new TextDecoder();
+function requirePassword(password){
+  if(typeof password!=='string'||password.length<8)throw new Error('La contraseña debe tener al menos 8 caracteres.');
+  return password;
+}
+function webCrypto(){
+  if(!globalThis.crypto?.subtle||typeof globalThis.crypto.getRandomValues!=='function')throw new Error('Web Crypto no está disponible en este navegador.');
+  return globalThis.crypto;
+}
+async function deriveWalletKey(password,salt){
+  const subtle=webCrypto().subtle;
+  const material=await subtle.importKey('raw',textEncoder.encode(requirePassword(password)),'PBKDF2',false,['deriveKey']);
+  return subtle.deriveKey({name:'PBKDF2',salt,iterations:PBKDF2_ITERATIONS,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+export function isEncryptedWalletPayload(value){
+  try{
+    const text=typeof value==='string'?value:textDecoder.decode(value instanceof Uint8Array?value:new Uint8Array(value));
+    return JSON.parse(text.trim()).format===ENCRYPTED_WALLET_FORMAT;
+  }catch{return false;}
+}
+export async function encryptWallet(walletData,password){
+  const cryptoApi=webCrypto(),salt=new Uint8Array(16),iv=new Uint8Array(12);
+  cryptoApi.getRandomValues(salt);cryptoApi.getRandomValues(iv);
+  const key=await deriveWalletKey(password,salt);
+  const plaintext=typeof walletData==='string'?walletData:JSON.stringify(walletData);
+  const ciphertext=await cryptoApi.subtle.encrypt({name:'AES-GCM',iv},key,textEncoder.encode(plaintext));
+  return JSON.stringify({format:ENCRYPTED_WALLET_FORMAT,kdf:'PBKDF2-SHA-256',iterations:PBKDF2_ITERATIONS,cipher:'AES-256-GCM',salt:bytesToBase64(salt),iv:bytesToBase64(iv),data:bytesToBase64(new Uint8Array(ciphertext))});
+}
+export async function decryptWallet(encryptedData,password){
+  let envelope;
+  try{envelope=typeof encryptedData==='string'?JSON.parse(encryptedData):JSON.parse(textDecoder.decode(encryptedData));}catch{throw new Error('Archivo de cartera cifrada inválido.');}
+  if(envelope?.format!==ENCRYPTED_WALLET_FORMAT||envelope.kdf!=='PBKDF2-SHA-256'||envelope.cipher!=='AES-256-GCM'||envelope.iterations!==PBKDF2_ITERATIONS)throw new Error('Formato de cartera cifrada no compatible.');
+  try{
+    const key=await deriveWalletKey(password,base64ToBytes(envelope.salt));
+    const plaintext=await webCrypto().subtle.decrypt({name:'AES-GCM',iv:base64ToBytes(envelope.iv)},key,base64ToBytes(envelope.data));
+    return textDecoder.decode(plaintext);
+  }catch{throw new Error('No se pudo descifrar la cartera. Comprueba la contraseña.');}
+}
 
 export class WalletCore {
   #account=null; #state={address:null,balance:null,snapshot:null,history:[]}; #stop=null; #generation=0; #busy=false; #reserved=new Set(); #pendingBroadcasts=new Map();
@@ -21,10 +63,17 @@ export class WalletCore {
     if(bytes.length<40||bytes.length>2*1024*1024)throw new Error('Cabecera PoS inválida.');
     return {signature:signEd25519(this.#account.secretKey,bytes),publicKey:this.#account.publicKey.slice()};
   }
-  async importFile(file){
+  async importFile(file,{passwordProvider}={}){
     if(!file?.name?.toLowerCase().endsWith('.webd')||file.size>1024*1024)throw new Error('Selecciona un archivo .webd menor de 1 MB.');
-    const bytes=new Uint8Array(await file.arrayBuffer());let parsed;
-    try{parsed=parseWebdWallet(bytes);}finally{bytes.fill(0);}
+    let bytes=new Uint8Array(await file.arrayBuffer());let parsed;
+    try{
+      if(isEncryptedWalletPayload(bytes)){
+        const password=await passwordProvider?.();
+        if(!password)throw new Error('Se requiere la contraseña para importar la cartera cifrada.');
+        const cleartext=await decryptWallet(bytes,password);bytes=textEncoder.encode(cleartext);
+      }
+      parsed=parseWebdWallet(bytes);
+    }finally{bytes.fill(0);}
     const entry=parsed.addresses.find(a=>a.secretKey)||parsed.addresses[0];
     for(const other of parsed.addresses)if(other!==entry)other.secretKey?.fill(0);
     this.#load(entry);return this.publicState();
@@ -61,6 +110,9 @@ export class WalletCore {
     if(!this.isUnlocked)throw new Error('Carga una cartera desbloqueada.');
     return JSON.stringify({version:'0.1',address:this.getAddress(),publicKey:bytesToHex(this.#account.publicKey),privateKey:bytesToHex(privateKeyWif(this.#account.secretKey))});
   }
+  async exportEncryptedWallet(password){return encryptWallet(this.exportWallet(),password);}
+  async encryptWallet(walletData,password){return encryptWallet(walletData,password);}
+  async decryptWallet(encryptedData,password){return decryptWallet(encryptedData,password);}
   quote({to,amount}){
     decodeWebdAddress(to);
     const transfer=withMinerFee(calculateTransfer(amount));
