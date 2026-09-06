@@ -72,7 +72,7 @@ Si el módulo falla, la cartera conserva la dirección y el saldo consultado. El
 5. Para comprar, pulsa **Comprar** junto a un listado obtenido del nodo. Revisa el identificador, cantidad, vendedor y precio; confirma para firmar y transmitir a `/marketplace/purchases`.
 6. Si el nodo se desconecta después de tu confirmación, la aplicación muestra **Pendientes de red** y conserva la orden firmada únicamente en la sesión. Cuando el nodo Marketplace vuelva a anunciar el protocolo, pulsa **Reintentar pendientes**; una orden desaparece de la cola solo después del acuse válido del nodo.
 
-El repositorio oficial WebDollar2 aún describe su código como “Under development. Not working right now”. Su API de Assets no es un libro de órdenes: aun cuando se puedan leer tokens reales, **Listar activo** y **Comprar** se bloquean antes de firmar mientras el nodo no anuncie el capability Marketplace verificable. Esta respuesta evita crear una firma o un listado local que no pueda liquidarse en la blockchain.
+El repositorio oficial WebDollar2 aún describe su código como “Under development. Not working right now”. Su API de Assets no es un libro de órdenes: aun cuando se puedan leer tokens reales, **Listar activo** y **Comprar** solo abren revisión humana y quedan como **Pendientes de red** mientras el nodo no anuncie el capability Marketplace verificable. No se presenta ningún listado local como publicado ni ninguna compra como liquidada.
 
 ## Bloquear
 

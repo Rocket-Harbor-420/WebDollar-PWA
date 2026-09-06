@@ -31,7 +31,6 @@ function normalizePrice(value){
   return price;
 }
 function normalizeEndpoint(value){return String(value||'').replace(/\/$/,'');}
-function protocolError(){return new Error(MARKETPLACE_UNAVAILABLE);}
 async function requestJson(url,{method='GET',body}={}){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),MAX_REQUEST_MS);
   try{
@@ -79,7 +78,7 @@ function isTransportFailure(error){
 }
 function clone(value){return typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value));}
 function queueOperation(module,kind,signedOrder){
-  const operation={id:pendingId(),kind,order:clone(signedOrder),queuedAt:new Date().toISOString(),status:'pending-network'};
+  const operation={id:pendingId(),kind,order:clone(signedOrder),queuedAt:new Date().toISOString(),status:'pending-network',reason:module.connected?'marketplace-protocol-unavailable':'transport-unavailable'};
   module.pendingOperations.push(operation);
   module.core?.events.emit('marketplace:queued',clone(operation));
   return {status:'queued',queued:true,pendingId:operation.id};
@@ -165,7 +164,6 @@ export const marketplaceModule={
   },
   listAssetForSale(assetId,amount,price){
     const data={operation:'list',assetId:normalizeText(assetId,'Asset ID'),amount:normalizeAmount(amount),price:normalizePrice(price)};
-    if(this.connected&&!this.marketplaceProtocolSupported)throw protocolError();
     const signer=globalThis.window?.webdollarCore?.signMarketplaceOrder||this.core?.signMarketplaceOrder;
     if(!signer)throw new Error('El Core no expone el hook de firma del Marketplace.');
     return signer(data);
@@ -173,7 +171,6 @@ export const marketplaceModule={
   buyAsset(listingId){
     const listing=this.listings.find(item=>item.id===String(listingId));
     if(!listing)throw new Error('El listado ya no está disponible; actualiza el mercado.');
-    if(this.connected&&!this.marketplaceProtocolSupported)throw protocolError();
     const signer=globalThis.window?.webdollarCore?.signMarketplaceOrder||this.core?.signMarketplaceOrder;
     if(!signer)throw new Error('El Core no expone el hook de firma del Marketplace.');
     return signer({operation:'buy',listingId:listing.id,assetId:listing.assetId,amount:listing.amount,price:listing.price,seller:listing.seller});
@@ -181,14 +178,12 @@ export const marketplaceModule={
   getPendingOperations(){return clone(this.pendingOperations);},
   async submitListing(signedOrder){
     if(!signedOrder?.signature||signedOrder.operation!=='list'||signedOrder.format!==ORDER_FORMAT)throw new Error('Orden de venta firmada inválida.');
-    if(!this.connected)return queueOperation(this,'listing',signedOrder);
-    if(!this.marketplaceProtocolSupported)throw protocolError();
+    if(!this.connected||!this.marketplaceProtocolSupported)return queueOperation(this,'listing',signedOrder);
     try{return await postOrder(this,'listing',signedOrder);}catch(error){if(!isTransportFailure(error))throw error;return queueOperation(this,'listing',signedOrder);}
   },
   async submitPurchase(signedOrder){
     if(!signedOrder?.signature||signedOrder.operation!=='buy'||signedOrder.format!==ORDER_FORMAT)throw new Error('Orden de compra firmada inválida.');
-    if(!this.connected)return queueOperation(this,'purchase',signedOrder);
-    if(!this.marketplaceProtocolSupported)throw protocolError();
+    if(!this.connected||!this.marketplaceProtocolSupported)return queueOperation(this,'purchase',signedOrder);
     try{return await postOrder(this,'purchase',signedOrder);}catch(error){if(!isTransportFailure(error))throw error;return queueOperation(this,'purchase',signedOrder);}
   },
   async retryPending(){

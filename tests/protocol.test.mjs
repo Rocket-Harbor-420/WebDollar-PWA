@@ -223,8 +223,8 @@ test('marketplace uses the public review hook and signs only after confirmation'
 });
 
 test('marketplace reads WebDollar2 account assets from the native account and asset APIs',async()=>{
-  const events=new EventBus(),account=fixtureAccount(),originalFetch=globalThis.fetch,assetHash=Buffer.alloc(32,1).toString('base64');
-  marketplaceModule.init({events,getAddress:()=>account.address,getBalance:()=>333});
+  const events=new EventBus(),account=fixtureAccount(),originalFetch=globalThis.fetch,assetHash=Buffer.alloc(32,1).toString('base64');let reviewCalls=0;
+  marketplaceModule.init({events,getAddress:()=>account.address,getBalance:()=>333,signMarketplaceOrder:data=>{reviewCalls++;return {reviewRequired:true,...data};}});
   globalThis.fetch=async(url)=>{
     const path=new URL(url).pathname;
     if(path==='/')return {ok:true,json:async()=>({name:'WebDollar2',version:'0.1.0',network:0})};
@@ -240,7 +240,9 @@ test('marketplace reads WebDollar2 account assets from the native account and as
     const assets=await marketplaceModule.fetchAssets(account.address);
     assert.deepEqual(assets.assets,[{id:'AST-010203',symbol:'AST',name:'Asset Real',balance:'123.45',native:false,decimals:2}]);
     assert.deepEqual(await marketplaceModule.getListings(),[]);
-    assert.throws(()=>marketplaceModule.listAssetForSale('AST-010203','1','25'),/protocolo Marketplace/i);
+    assert.deepEqual(marketplaceModule.listAssetForSale('AST-010203','1','25'),{reviewRequired:true,operation:'list',assetId:'AST-010203',amount:'1',price:'25'});assert.equal(reviewCalls,1);
+    const queued=await marketplaceModule.submitListing({format:'webdollar-market-order-v1',operation:'list',signature:'test-signature',assetId:'AST-010203',amount:'1',price:'25'});
+    assert.equal(queued.status,'queued');assert.equal(marketplaceModule.getPendingOperations()[0].reason,'marketplace-protocol-unavailable');
   }finally{globalThis.fetch=originalFetch;}
 });
 
